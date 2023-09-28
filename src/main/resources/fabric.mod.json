@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "id": "macula",
+  "id": "ac-macula",
   "version": "${version}",
 
   "name": "Macula",
   "description": "Shaders for old Minecraft",
   "authors": [
     "daxnitro",
-    "mine_diver"
+    "mine_diver",
+    "TechPizzaDev"
   ],
   "contact": {
-    "homepage": "https://glass-repo.net/repo/mod/macula",
-    "sources": "https://github.com/mineLdiver/Macula",
-    "issues": "https://github.com/mineLdiver/Macula/issues"
+    "sources": "https://github.com/Adventurecraft-Awakening/Macula",
+    "issues": "https://github.com/Adventurecraft-Awakening/Macula/issues"
   },
 
   "license": "MIT",
