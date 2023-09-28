@@ -14,8 +14,10 @@ import org.lwjgl.opengl.GL11;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -66,20 +68,20 @@ public class Shaders {
     // Shadow stuff
 
     // configuration
-    private static int shadowPassInterval   = 0;
-    private static int shadowMapWidth       = 1024;
-    private static int shadowMapHeight      = 1024;
-    private static float shadowMapFOV       = 25.0f;
+    private static int shadowPassInterval = 0;
+    private static int shadowMapWidth = 1024;
+    private static int shadowMapHeight = 1024;
+    private static float shadowMapFOV = 25.0f;
     private static float shadowMapHalfPlane = 30.0f;
     private static boolean shadowMapIsOrtho = true;
 
-    private static int shadowPassCounter  = 0;
+    private static int shadowPassCounter = 0;
 
     private static boolean isShadowPass = false;
 
     private static int sfb = 0;
     private static int sfbDepthTexture = 0;
-    private static int sfbDepthBuffer  = 0;
+    private static int sfbDepthBuffer = 0;
 
     private static FloatBuffer shadowProjection = null;
     private static FloatBuffer shadowProjectionInverse = null;
@@ -103,42 +105,42 @@ public class Shaders {
 
     public static int activeProgram = 0;
 
-    public final static int ProgramNone         = 0;
-    public final static int ProgramBasic        = 1;
-    public final static int ProgramTextured     = 2;
-    public final static int ProgramTexturedLit  = 3;
-    public final static int ProgramTerrain      = 4;
-    public final static int ProgramWater        = 5;
-    public final static int ProgramHand         = 6;
-    public final static int ProgramWeather      = 7;
-    public final static int ProgramComposite    = 8;
-    public final static int ProgramFinal        = 9;
-    public final static int ProgramCount        = 10;
+    public final static int ProgramNone = 0;
+    public final static int ProgramBasic = 1;
+    public final static int ProgramTextured = 2;
+    public final static int ProgramTexturedLit = 3;
+    public final static int ProgramTerrain = 4;
+    public final static int ProgramWater = 5;
+    public final static int ProgramHand = 6;
+    public final static int ProgramWeather = 7;
+    public final static int ProgramComposite = 8;
+    public final static int ProgramFinal = 9;
+    public final static int ProgramCount = 10;
 
-    private static final String[] programNames = new String[] {
-            "",
-            "gbuffers_basic",
-            "gbuffers_textured",
-            "gbuffers_textured_lit",
-            "gbuffers_terrain",
-            "gbuffers_water",
-            "gbuffers_hand",
-            "gbuffers_weather",
-            "composite",
-            "final",
+    private static final String[] programNames = new String[]{
+        "",
+        "gbuffers_basic",
+        "gbuffers_textured",
+        "gbuffers_textured_lit",
+        "gbuffers_terrain",
+        "gbuffers_water",
+        "gbuffers_hand",
+        "gbuffers_weather",
+        "composite",
+        "final",
     };
 
-    private static final int[] programBackups = new int[] {
-            ProgramNone,            // none
-            ProgramNone,            // basic
-            ProgramBasic,           // textured
-            ProgramTextured,        // textured/lit
-            ProgramTexturedLit,     // terrain
-            ProgramTerrain,         // water
-            ProgramTexturedLit,     // hand
-            ProgramTexturedLit,     // weather
-            ProgramNone,            // composite
-            ProgramNone,            // final
+    private static final int[] programBackups = new int[]{
+        ProgramNone,            // none
+        ProgramNone,            // basic
+        ProgramBasic,           // textured
+        ProgramTextured,        // textured/lit
+        ProgramTexturedLit,     // terrain
+        ProgramTerrain,         // water
+        ProgramTexturedLit,     // hand
+        ProgramTexturedLit,     // weather
+        ProgramNone,            // composite
+        ProgramNone,            // final
     };
 
     private static final int[] programs = new int[ProgramCount];
@@ -157,8 +159,8 @@ public class Shaders {
 
     // config stuff
     public static final File
-            configDir = FabricLoader.getInstance().getConfigDir().resolve("macula").toFile(),
-            shaderConfigFile = new File(configDir, "shaders.properties");
+        configDir = FabricLoader.getInstance().getConfigDir().resolve("macula").toFile(),
+        shaderConfigFile = new File(configDir, "shaders.properties");
     public static final Properties shadersConfig = new Properties();
     public static float configShadowResMul = 1;
 
@@ -334,7 +336,8 @@ public class Shaders {
 
         if (!isInitialized) init();
         if (!shaderPackLoaded) return;
-        if (MinecraftInstance.get().actualWidth != renderWidth || MinecraftInstance.get().actualHeight != renderHeight) resize();
+        if (MinecraftInstance.get().actualWidth != renderWidth || MinecraftInstance.get().actualHeight != renderHeight)
+            resize();
 
         if (shadowPassInterval > 0 && --shadowPassCounter <= 0) {
             // do shadow pass
@@ -532,7 +535,7 @@ public class Shaders {
     }
 
     private static void resize() {
-        renderWidth  = MinecraftInstance.get().actualWidth;
+        renderWidth = MinecraftInstance.get().actualWidth;
         renderHeight = MinecraftInstance.get().actualHeight;
         setupFrameBuffer();
     }
@@ -558,7 +561,7 @@ public class Shaders {
             if (entityAttrib >= 0) glBindAttribLocationARB(program, entityAttrib, "mc_Entity");
             glLinkProgramARB(program);
             glValidateProgramARB(program);
-            printLogInfo(program);
+            printLogInfo(program, vShaderPath + " + " + fShaderPath);
         } else if (program != 0) {
             glDeleteObjectARB(program);
             program = 0;
@@ -587,14 +590,14 @@ public class Shaders {
             setProgramUniform1i("normals", 2);
             setProgramUniform1i("specular", 3);
         } else if (program == ProgramComposite || program == ProgramFinal) {
-            setProgramUniform1i("gcolor",    0);
-            setProgramUniform1i("gdepth",    1);
-            setProgramUniform1i("gnormal",   2);
+            setProgramUniform1i("gcolor", 0);
+            setProgramUniform1i("gdepth", 1);
+            setProgramUniform1i("gnormal", 2);
             setProgramUniform1i("composite", 3);
-            setProgramUniform1i("gaux1",     4);
-            setProgramUniform1i("gaux2",     5);
-            setProgramUniform1i("gaux3",     6);
-            setProgramUniform1i("shadow",    7);
+            setProgramUniform1i("gaux1", 4);
+            setProgramUniform1i("gaux2", 5);
+            setProgramUniform1i("gaux3", 6);
+            setProgramUniform1i("shadow", 7);
             setProgramUniformMatrix4ARB("gbufferPreviousProjection", false, previousProjection);
             setProgramUniformMatrix4ARB("gbufferProjection", false, projection);
             setProgramUniformMatrix4ARB("gbufferProjectionInverse", false, projectionInverse);
@@ -611,16 +614,16 @@ public class Shaders {
         setProgramUniform1i("heldBlockLightValue", (stack == null || stack.itemId >= BlockBase.BY_ID.length ? 0 : BlockBase.EMITTANCE[stack.itemId]));
         setProgramUniform1i("fogMode", (fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
         setProgramUniform1f("rainStrength", rainStrength);
-        setProgramUniform1i("worldTime", (int)(MinecraftInstance.get().level.getLevelTime() % 24000L));
-        setProgramUniform1f("aspectRatio", (float)renderWidth / (float)renderHeight);
-        setProgramUniform1f("viewWidth", (float)renderWidth);
-        setProgramUniform1f("viewHeight", (float)renderHeight);
+        setProgramUniform1i("worldTime", (int) (MinecraftInstance.get().level.getLevelTime() % 24000L));
+        setProgramUniform1f("aspectRatio", (float) renderWidth / (float) renderHeight);
+        setProgramUniform1f("viewWidth", (float) renderWidth);
+        setProgramUniform1f("viewHeight", (float) renderHeight);
         setProgramUniform1f("near", 0.05F);
         setProgramUniform1f("far", 256 >> MinecraftInstance.get().options.viewDistance);
         setProgramUniform3f("sunPosition", sunPosition[0], sunPosition[1], sunPosition[2]);
         setProgramUniform3f("moonPosition", moonPosition[0], moonPosition[1], moonPosition[2]);
-        setProgramUniform3f("previousCameraPosition", (float)previousCameraPosition[0], (float)previousCameraPosition[1], (float)previousCameraPosition[2]);
-        setProgramUniform3f("cameraPosition", (float)cameraPosition[0], (float)cameraPosition[1], (float)cameraPosition[2]);
+        setProgramUniform3f("previousCameraPosition", (float) previousCameraPosition[0], (float) previousCameraPosition[1], (float) previousCameraPosition[2]);
+        setProgramUniform3f("cameraPosition", (float) cameraPosition[0], (float) cameraPosition[1], (float) cameraPosition[2]);
         setProgramUniformMatrix4ARB("gbufferModelView", false, modelView);
         setProgramUniformMatrix4ARB("gbufferModelViewInverse", false, modelViewInverse);
     }
@@ -662,39 +665,39 @@ public class Shaders {
 
     private static float[] multiplyMat4xVec4(float[] ta, float[] tb) {
         float[] mout = new float[4];
-        mout[0] = ta[0] * tb[0] + ta[4] * tb[1] +  ta[8] * tb[2] + ta[12] * tb[3];
-        mout[1] = ta[1] * tb[0] + ta[5] * tb[1] +  ta[9] * tb[2] + ta[13] * tb[3];
+        mout[0] = ta[0] * tb[0] + ta[4] * tb[1] + ta[8] * tb[2] + ta[12] * tb[3];
+        mout[1] = ta[1] * tb[0] + ta[5] * tb[1] + ta[9] * tb[2] + ta[13] * tb[3];
         mout[2] = ta[2] * tb[0] + ta[6] * tb[1] + ta[10] * tb[2] + ta[14] * tb[3];
         mout[3] = ta[3] * tb[0] + ta[7] * tb[1] + ta[11] * tb[2] + ta[15] * tb[3];
         return mout;
     }
 
     private static FloatBuffer invertMat4x(FloatBuffer matin) {
-        float[] m   = new float[16];
+        float[] m = new float[16];
         float[] inv = new float[16];
         float det;
         int i;
 
         for (i = 0; i < 16; ++i) m[i] = matin.get(i);
 
-        inv[0]  =  m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
-        inv[4]  = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
-        inv[8]  =  m[4]*m[9]*m[15] - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9];
-        inv[12] = -m[4]*m[9]*m[14] + m[4]*m[10]*m[13] + m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9];
-        inv[1]  = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10];
-        inv[5]  =  m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10];
-        inv[9]  = -m[0]*m[9]*m[15] + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9];
-        inv[13] =  m[0]*m[9]*m[14] - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9];
-        inv[2]  =  m[1]*m[6]*m[15] - m[1]*m[7]*m[14] - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7] - m[13]*m[3]*m[6];
-        inv[6]  = -m[0]*m[6]*m[15] + m[0]*m[7]*m[14] + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7] + m[12]*m[3]*m[6];
-        inv[10] =  m[0]*m[5]*m[15] - m[0]*m[7]*m[13] - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7] - m[12]*m[3]*m[5];
-        inv[14] = -m[0]*m[5]*m[14] + m[0]*m[6]*m[13] + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6] + m[12]*m[2]*m[5];
-        inv[3]  = -m[1]*m[6]*m[11] + m[1]*m[7]*m[10] + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7] + m[9]*m[3]*m[6];
-        inv[7]  =  m[0]*m[6]*m[11] - m[0]*m[7]*m[10] - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7] - m[8]*m[3]*m[6];
-        inv[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5];
-        inv[15] =  m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5];
+        inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+        inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+        inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+        inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+        inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+        inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+        inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+        inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+        inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+        inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+        inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+        inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+        inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+        inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+        inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+        inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
 
-        det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
+        det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
 
         FloatBuffer invout = BufferUtils.createFloatBuffer(16);
 
@@ -736,9 +739,11 @@ public class Shaders {
             throw new RuntimeException(e);
         }
 
-        glShaderSourceARB(vertShader, vertexCode.toString());
+        glShaderSourceARB(vertShader, vertexCode);
         glCompileShaderARB(vertShader);
-        printLogInfo(vertShader);
+        if(!printLogInfo(vertShader, filename)) {
+            System.out.println("Source for \"" + filename + "\":\n" + vertexCode);
+        }
         return vertShader;
     }
 
@@ -793,13 +798,15 @@ public class Shaders {
             throw new RuntimeException(e);
         }
 
-        glShaderSourceARB(fragShader, fragCode.toString());
+        glShaderSourceARB(fragShader, fragCode);
         glCompileShaderARB(fragShader);
-        printLogInfo(fragShader);
+        if (!printLogInfo(fragShader, filename)) {
+            System.out.println("Source for \"" + filename + "\":\n" + fragCode);
+        }
         return fragShader;
     }
 
-    private static boolean printLogInfo(int obj) {
+    private static boolean printLogInfo(int obj, String fileName) {
         IntBuffer iVal = BufferUtils.createIntBuffer(1);
         glGetObjectParameterARB(obj, GL_OBJECT_INFO_LOG_LENGTH_ARB, iVal);
 
@@ -808,10 +815,8 @@ public class Shaders {
             ByteBuffer infoLog = BufferUtils.createByteBuffer(length);
             iVal.flip();
             glGetInfoLogARB(obj, iVal, infoLog);
-            byte[] infoBytes = new byte[length];
-            infoLog.get(infoBytes);
-            String out = new String(infoBytes);
-            System.out.println("Info log:\n" + out);
+            CharBuffer out = StandardCharsets.UTF_8.decode(infoLog);
+            System.out.println("Info log for \"" + fileName + "\":\n" + out);
             return false;
         }
         return true;
@@ -936,8 +941,8 @@ public class Shaders {
                     }
                 } else if (file1.isFile() && s.toLowerCase().endsWith(".zip")) zipShaders.add(s);
             }
+        } catch (Exception ignored) {
         }
-        catch (Exception ignored) {}
 
         folderShaders.sort(String.CASE_INSENSITIVE_ORDER);
         zipShaders.sort(String.CASE_INSENSITIVE_ORDER);
@@ -952,14 +957,16 @@ public class Shaders {
     public static void loadConfig() {
         try {
             if (!shaderPacksDir.exists()) shaderPacksDir.mkdir();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), "");
 
         if (shaderConfigFile.exists())
             try (FileReader filereader = new FileReader(shaderConfigFile)) {
                 shadersConfig.load(filereader);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
         if (!shaderConfigFile.exists()) try {
             storeConfig();
@@ -995,7 +1002,8 @@ public class Shaders {
 
         try (FileWriter filewriter = new FileWriter(shaderConfigFile)) {
             shadersConfig.store(filewriter, null);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     public static String getEnumShaderOption(ShaderOption eso) {
