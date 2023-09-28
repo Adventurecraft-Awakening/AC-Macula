@@ -17,34 +17,40 @@ import java.nio.ShortBuffer;
 
 @Mixin(Tessellator.class)
 public class TessellatorMixin implements TessellatorAccessor {
-    @Shadow private int drawingMode;
+    @Shadow
+    private int drawingMode;
 
-    @Shadow private static boolean useTriangles;
+    @Shadow
+    private static boolean useTriangles;
 
-    @Shadow private int vertexAmount;
+    @Shadow
+    private int vertexAmount;
 
-    @Shadow private boolean hasNormals;
+    @Shadow
+    private boolean hasNormals;
 
-    @Shadow private int[] bufferArray;
+    @Shadow
+    private int[] bufferArray;
 
-    @Shadow private int field_2068;
+    @Shadow
+    private int field_2068;
 
     @Inject(
-            method = "<init>(I)V",
-            at = @At("RETURN")
+        method = "<init>(I)V",
+        at = @At("RETURN")
     )
     private void onCor(int var1, CallbackInfo ci) {
-        shadersData = new short[] {-1, 0};
+        shadersData = new short[]{-1, 0};
         shadersBuffer = class_214.method_744(var1 / 8 * 4);
         shadersShortBuffer = shadersBuffer.asShortBuffer();
     }
 
     @Inject(
-            method = "draw()V",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V"
-            )
+        method = "draw()V",
+        at = @At(
+            value = "INVOKE",
+            target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V"
+        )
     )
     private void onDraw1(CallbackInfo ci) {
         if (!Shaders.shaderPackLoaded) return;
@@ -55,12 +61,12 @@ public class TessellatorMixin implements TessellatorAccessor {
     }
 
     @Inject(
-            method = "draw()V",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V",
-                    shift = At.Shift.AFTER
-            )
+        method = "draw()V",
+        at = @At(
+            value = "INVOKE",
+            target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V",
+            shift = At.Shift.AFTER
+        )
     )
     private void onDraw2(CallbackInfo ci) {
         if (!Shaders.shaderPackLoaded) return;
@@ -69,8 +75,8 @@ public class TessellatorMixin implements TessellatorAccessor {
     }
 
     @Inject(
-            method = "clear()V",
-            at = @At(value = "RETURN")
+        method = "clear()V",
+        at = @At(value = "RETURN")
     )
     private void onReset(CallbackInfo ci) {
         if (!Shaders.shaderPackLoaded) return;
@@ -78,17 +84,21 @@ public class TessellatorMixin implements TessellatorAccessor {
     }
 
     @Inject(
-            method = "addVertex(DDD)V",
-            at = @At(value = "HEAD")
+        method = "addVertex(DDD)V",
+        at = @At(value = "HEAD")
     )
     private void onAddVertex(CallbackInfo ci) {
         if (!Shaders.shaderPackLoaded) return;
-        if (drawingMode == 7 && useTriangles && (vertexAmount + 1) % 4 == 0 && hasNormals) {
-            bufferArray[field_2068 + 6] = bufferArray[(field_2068 - 24) + 6];
+        if (drawingMode == 7 && useTriangles && (vertexAmount + 1) % 4 == 0) {
+            if (hasNormals) {
+                bufferArray[field_2068 + 6] = bufferArray[(field_2068 - 24) + 6];
+                bufferArray[field_2068 + 8 + 6] = bufferArray[(field_2068 + 8 - 16) + 6];
+            }
+
             shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
-            bufferArray[field_2068 + 8 + 6] = bufferArray[(field_2068 + 8 - 16) + 6];
             shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
         }
+
         shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
     }
 
