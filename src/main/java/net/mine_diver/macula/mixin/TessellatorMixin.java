@@ -95,11 +95,15 @@ public class TessellatorMixin implements TessellatorAccessor {
                 bufferArray[field_2068 + 8 + 6] = bufferArray[(field_2068 + 8 - 16) + 6];
             }
 
-            shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
-            shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+            if (Shaders.entityAttrib >= 0) {
+                shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+                shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+            }
         }
 
-        shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+        if (Shaders.entityAttrib >= 0) {
+            shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+        }
     }
 
     @Override
