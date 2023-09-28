@@ -40,7 +40,6 @@ public class TessellatorMixin implements TessellatorAccessor {
         at = @At("RETURN")
     )
     private void onCor(int var1, CallbackInfo ci) {
-        shadersData = new short[]{-1, 0};
         shadersBuffer = class_214.method_744(var1 / 8 * 4);
         shadersShortBuffer = shadersBuffer.asShortBuffer();
     }
@@ -96,23 +95,23 @@ public class TessellatorMixin implements TessellatorAccessor {
             }
 
             if (Shaders.entityAttrib >= 0) {
-                shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
-                shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+                shadersBuffer.putShort(this.entityId).putShort((short) 0);
+                shadersBuffer.putShort(this.entityId).putShort((short) 0);
             }
         }
 
         if (Shaders.entityAttrib >= 0) {
-            shadersBuffer.putShort(shadersData[0]).putShort(shadersData[1]);
+            shadersBuffer.putShort(this.entityId).putShort((short) 0);
         }
     }
 
     @Override
     @Unique
     public void setEntity(int id) {
-        shadersData[0] = (short) id;
+        this.entityId = (short) id;
     }
 
     public ByteBuffer shadersBuffer;
     public ShortBuffer shadersShortBuffer;
-    public short[] shadersData;
+    private short entityId = -1;
 }
