@@ -336,14 +336,15 @@ public class Shaders {
 
         if (!isInitialized) init();
         if (!shaderPackLoaded) return;
-        if (MinecraftInstance.get().actualWidth != renderWidth || MinecraftInstance.get().actualHeight != renderHeight)
+
+        if (minecraft.actualWidth != renderWidth || minecraft.actualHeight != renderHeight)
             resize();
 
         if (shadowPassInterval > 0 && --shadowPassCounter <= 0) {
             // do shadow pass
-            boolean preShadowPassThirdPersonView = MinecraftInstance.get().options.thirdPerson;
+            boolean preShadowPassThirdPersonView = minecraft.options.thirdPerson;
 
-            MinecraftInstance.get().options.thirdPerson = true;
+            minecraft.options.thirdPerson = true;
 
             isShadowPass = true;
             shadowPassCounter = shadowPassInterval;
@@ -352,13 +353,13 @@ public class Shaders {
 
             useProgram(ProgramNone);
 
-            MinecraftInstance.get().gameRenderer.delta(f, l);
+            minecraft.gameRenderer.delta(f, l);
 
             glFlush();
 
             isShadowPass = false;
 
-            MinecraftInstance.get().options.thirdPerson = preShadowPassThirdPersonView;
+            minecraft.options.thirdPerson = preShadowPassThirdPersonView;
         }
 
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, dfb);
@@ -609,17 +610,18 @@ public class Shaders {
                 setProgramUniformMatrix4ARB("shadowModelViewInverse", false, shadowModelViewInverse);
             }
         }
-        ItemInstance stack = MinecraftInstance.get().player.inventory.getHeldItem();
+        Minecraft minecraft = MinecraftInstance.get();
+        ItemInstance stack = minecraft.player.inventory.getHeldItem();
         setProgramUniform1i("heldItemId", (stack == null ? -1 : stack.itemId));
         setProgramUniform1i("heldBlockLightValue", (stack == null || stack.itemId >= BlockBase.BY_ID.length ? 0 : BlockBase.EMITTANCE[stack.itemId]));
         setProgramUniform1i("fogMode", (fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
         setProgramUniform1f("rainStrength", rainStrength);
-        setProgramUniform1i("worldTime", (int) (MinecraftInstance.get().level.getLevelTime() % 24000L));
+        setProgramUniform1i("worldTime", (int) (minecraft.level.getLevelTime() % 24000L));
         setProgramUniform1f("aspectRatio", (float) renderWidth / (float) renderHeight);
         setProgramUniform1f("viewWidth", (float) renderWidth);
         setProgramUniform1f("viewHeight", (float) renderHeight);
         setProgramUniform1f("near", 0.05F);
-        setProgramUniform1f("far", 256 >> MinecraftInstance.get().options.viewDistance);
+        setProgramUniform1f("far", 256 >> minecraft.options.viewDistance);
         setProgramUniform3f("sunPosition", sunPosition[0], sunPosition[1], sunPosition[2]);
         setProgramUniform3f("moonPosition", moonPosition[0], moonPosition[1], moonPosition[2]);
         setProgramUniform3f("previousCameraPosition", (float) previousCameraPosition[0], (float) previousCameraPosition[1], (float) previousCameraPosition[2]);
