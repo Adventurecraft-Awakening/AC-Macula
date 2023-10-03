@@ -43,8 +43,9 @@ public class Shaders {
     private static int renderWidth = 0;
     private static int renderHeight = 0;
 
-    private static float[] sunPosition = new float[3];
-    private static float[] moonPosition = new float[3];
+    private static final FloatBuffer celestialModelView = BufferUtils.createFloatBuffer(16);
+    private static final float[] sunPosition = new float[3];
+    private static final float[] moonPosition = new float[3];
 
     private static final float[] clearColor = new float[3];
 
@@ -54,15 +55,13 @@ public class Shaders {
 
     public static int entityAttrib = -1;
 
-    private static FloatBuffer previousProjection = null;
+    private static FloatBuffer previousProjection = BufferUtils.createFloatBuffer(16);
+    private static FloatBuffer projection = BufferUtils.createFloatBuffer(16);
+    private static final FloatBuffer projectionInverse = BufferUtils.createFloatBuffer(16);
 
-    private static FloatBuffer projection = null;
-    private static FloatBuffer projectionInverse = null;
-
-    private static FloatBuffer previousModelView = null;
-
-    private static FloatBuffer modelView = null;
-    private static FloatBuffer modelViewInverse = null;
+    private static FloatBuffer previousModelView = BufferUtils.createFloatBuffer(16);
+    private static FloatBuffer modelView = BufferUtils.createFloatBuffer(16);
+    private static final FloatBuffer modelViewInverse = BufferUtils.createFloatBuffer(16);
 
     private static final double[] previousCameraPosition = new double[3];
     private static final double[] cameraPosition = new double[3];
@@ -85,11 +84,11 @@ public class Shaders {
     private static int sfbDepthTexture = 0;
     private static int sfbDepthBuffer = 0;
 
-    private static FloatBuffer shadowProjection = null;
-    private static FloatBuffer shadowProjectionInverse = null;
+    private static final FloatBuffer shadowProjection = BufferUtils.createFloatBuffer(16);
+    private static final FloatBuffer shadowProjectionInverse = BufferUtils.createFloatBuffer(16);
 
-    private static FloatBuffer shadowModelView = null;
-    private static FloatBuffer shadowModelViewInverse = null;
+    private static final FloatBuffer shadowModelView = BufferUtils.createFloatBuffer(16);
+    private static final FloatBuffer shadowModelViewInverse = BufferUtils.createFloatBuffer(16);
 
     // Color attachment stuff
 
@@ -296,7 +295,8 @@ public class Shaders {
             // just backwards compatibility. it's only used when SHADOWFOV is set in the shaders.
             if (shadowMapIsOrtho)
                 glOrtho(-shadowMapHalfPlane, shadowMapHalfPlane, -shadowMapHalfPlane, shadowMapHalfPlane, 0.05f, 256.0f);
-            else gluPerspective(shadowMapFOV, (float) shadowMapWidth / (float) shadowMapHeight, 0.05f, 256.0f);
+            else
+                gluPerspective(shadowMapFOV, (float) shadowMapWidth / (float) shadowMapHeight, 0.05f, 256.0f);
 
             glMatrixMode(GL_MODELVIEW);
             glLoadIdentity();
@@ -305,31 +305,36 @@ public class Shaders {
             float angle = MinecraftInstance.get().level.method_198(f) * 360.0f;
             // night time
             // day time
-            if (angle < 90.0 || angle > 270.0) glRotatef(angle - 90.0f, -1.0f, 0.0f, 0.0f);
-            else glRotatef(angle + 90.0f, -1.0f, 0.0f, 0.0f);
+            if (angle < 90.0 || angle > 270.0)
+                glRotatef(angle - 90.0f, -1.0f, 0.0f, 0.0f);
+            else
+                glRotatef(angle + 90.0f, -1.0f, 0.0f, 0.0f);
+
             // reduces jitter
             if (shadowMapIsOrtho)
                 glTranslatef((float) x % 10.0f - 5.0f, (float) y % 10.0f - 5.0f, (float) z % 10.0f - 5.0f);
 
-            shadowProjection = BufferUtils.createFloatBuffer(16);
-            glGetFloat(GL_PROJECTION_MATRIX, shadowProjection);
-            shadowProjectionInverse = invertMat4x(shadowProjection);
+            glGetFloat(GL_PROJECTION_MATRIX, shadowProjection.clear());
+            invertMat4x(shadowProjectionInverse.clear(), shadowProjection);
 
-            shadowModelView = BufferUtils.createFloatBuffer(16);
-            glGetFloat(GL_MODELVIEW_MATRIX, shadowModelView);
-            shadowModelViewInverse = invertMat4x(shadowModelView);
+            glGetFloat(GL_MODELVIEW_MATRIX, shadowModelView.clear());
+            invertMat4x(shadowModelViewInverse.clear(), shadowModelView);
             return;
         }
 
+        // Swap buffers
+        FloatBuffer nextProjection = previousProjection;
         previousProjection = projection;
-        projection = BufferUtils.createFloatBuffer(16);
+        projection = nextProjection;
         glGetFloat(GL_PROJECTION_MATRIX, projection);
-        projectionInverse = invertMat4x(projection);
+        invertMat4x(projectionInverse.clear(), projection);
 
+        // Swap buffers
+        FloatBuffer nextModelView = previousModelView;
         previousModelView = modelView;
-        modelView = BufferUtils.createFloatBuffer(16);
+        modelView = nextModelView;
         glGetFloat(GL_MODELVIEW_MATRIX, modelView);
-        modelViewInverse = invertMat4x(modelView);
+        invertMat4x(modelViewInverse.clear(), modelView);
 
         previousCameraPosition[0] = cameraPosition[0];
         previousCameraPosition[1] = cameraPosition[1];
@@ -650,30 +655,26 @@ public class Shaders {
     public static void setCelestialPosition() {
         // This is called when the current matrix is the modelview matrix based on the celestial angle.
         // The sun is at (0, 100, 0), and the moon is at (0, -100, 0).
-        FloatBuffer modelView = BufferUtils.createFloatBuffer(16);
-        glGetFloat(GL_MODELVIEW_MATRIX, modelView);
+        glGetFloat(GL_MODELVIEW_MATRIX, celestialModelView.clear());
         float[] mv = new float[16];
-        modelView.get(mv, 0, 16);
-        sunPosition = multiplyMat4xVec4(mv, new float[]{0.0F, 100.0F, 0.0F, 0.0F});
-        moonPosition = multiplyMat4xVec4(mv, new float[]{0.0F, -100.0F, 0.0F, 0.0F});
+        celestialModelView.get(mv, 0, 16);
+        multiplyMat4ByVec4ToVec3(sunPosition, mv, new float[]{0.0F, 100.0F, 0.0F, 0.0F});
+        multiplyMat4ByVec4ToVec3(moonPosition, mv, new float[]{0.0F, -100.0F, 0.0F, 0.0F});
     }
 
-    private static float[] multiplyMat4xVec4(float[] ta, float[] tb) {
-        float[] mout = new float[4];
+    private static void multiplyMat4ByVec4ToVec3(float[] mout, float[] ta, float[] tb) {
         mout[0] = ta[0] * tb[0] + ta[4] * tb[1] + ta[8] * tb[2] + ta[12] * tb[3];
         mout[1] = ta[1] * tb[0] + ta[5] * tb[1] + ta[9] * tb[2] + ta[13] * tb[3];
         mout[2] = ta[2] * tb[0] + ta[6] * tb[1] + ta[10] * tb[2] + ta[14] * tb[3];
-        mout[3] = ta[3] * tb[0] + ta[7] * tb[1] + ta[11] * tb[2] + ta[15] * tb[3];
-        return mout;
     }
 
-    private static FloatBuffer invertMat4x(FloatBuffer matin) {
+    private static void invertMat4x(FloatBuffer dst, FloatBuffer matin) {
         float[] m = new float[16];
         float[] inv = new float[16];
-        float det;
-        int i;
 
-        for (i = 0; i < 16; ++i) m[i] = matin.get(i);
+        for (int i = 0; i < 16; ++i) {
+            m[i] = matin.get(i);
+        }
 
         inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
         inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
@@ -692,17 +693,16 @@ public class Shaders {
         inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
         inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
 
-        det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
-
-        FloatBuffer invout = BufferUtils.createFloatBuffer(16);
+        float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
 
         // no inverse :(
-        if (det == 0.0) return invout; // not actually the inverse
+        if (det == 0.0) {
+            return; // not actually the inverse
+        }
 
-
-        for (i = 0; i < 16; ++i) invout.put(i, inv[i] / det);
-
-        return invout;
+        for (int i = 0; i < 16; ++i) {
+            dst.put(i, inv[i] / det);
+        }
     }
 
     private static int createVertShader(ZipFile zipFile, String filename) {
