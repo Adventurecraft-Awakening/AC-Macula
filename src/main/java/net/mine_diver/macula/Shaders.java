@@ -187,27 +187,32 @@ public class Shaders {
         colorAttachments = 4;
 
         if (!currentShaderName.equals("(internal)")) {
-            boolean containsFolder;
             try (ZipFile zipFile = new ZipFile(new File(shaderPacksDir, currentShaderName))) {
                 ZipEntry zipEntry = zipFile.getEntry("shaders");
-                containsFolder = zipEntry != null && zipEntry.isDirectory();
+                boolean containsFolder = zipEntry != null && zipEntry.isDirectory();
+
+                for (int i = 0; i < ProgramCount; ++i) {
+                    if (programNames[i].equals("")) {
+                        programs[i] = ShaderProgram.empty;
+                    } else {
+                        programs[i] = setupProgram(
+                            zipFile,
+                            (containsFolder ? "shaders/" : "") + programNames[i] + ".vsh",
+                            (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
+                    }
+                }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            for (int i = 0; i < ProgramCount; ++i)
-                if (programNames[i].equals(""))
-                    programs[i] = ShaderProgram.empty;
-                else
-                    programs[i] = setupProgram(
-                        (containsFolder ? "shaders/" : "") + programNames[i] + ".vsh",
-                        (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
         }
 
         if (colorAttachments > maxDrawBuffers) System.out.println("Not enough draw buffers!");
 
         for (int i = 0; i < ProgramCount; ++i)
             for (int n = i; programs[i].isEmpty(); n = programBackups[n]) {
-                if (n == programBackups[n]) break;
+                if (n == programBackups[n]) {
+                    break;
+                }
                 programs[i] = programs[programBackups[n]];
             }
 
@@ -551,15 +556,15 @@ public class Shaders {
         setupShadowFrameBuffer();
     }
 
-    private static ShaderProgram setupProgram(String vShaderPath, String fShaderPath) {
+    private static ShaderProgram setupProgram(ZipFile zipFile, String vShaderPath, String fShaderPath) {
         int program = glCreateProgramObjectARB();
 
         int vShader = 0;
         int fShader = 0;
 
         if (program != 0) {
-            vShader = createVertShader(vShaderPath);
-            fShader = createFragShader(fShaderPath);
+            vShader = createVertShader(zipFile, vShaderPath);
+            fShader = createFragShader(zipFile, fShaderPath);
         }
 
         if (vShader != 0 || fShader != 0) {
@@ -700,33 +705,30 @@ public class Shaders {
         return invout;
     }
 
-    private static int createVertShader(String filename) {
+    private static int createVertShader(ZipFile zipFile, String filename) {
+        ZipEntry zipEntry = zipFile.getEntry(filename);
+        if (zipEntry == null) {
+            return 0;
+        }
+
         int vertShader = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-        if (vertShader == 0) return 0;
+        if (vertShader == 0) {
+            return 0;
+        }
+
         StringBuilder vertexCode = new StringBuilder();
-        String line;
-
-        try (ZipFile zipFile = new ZipFile(new File(shaderPacksDir, currentShaderName))) {
-            BufferedReader reader;
-            try {
-                reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipFile.getEntry(filename))));
-                while ((line = reader.readLine()) != null) {
-                    vertexCode.append(line).append("\n");
-                    if (line.matches("attribute [_a-zA-Z0-9]+ mc_Entity.*")) entityAttrib = 10;
+        try (var reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipEntry)))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                vertexCode.append(line).append("\n");
+                if (line.matches("attribute [_a-zA-Z0-9]+ mc_Entity.*")) {
+                    entityAttrib = 10;
                 }
-            } catch (Exception e) {
-                System.out.println("Couldn't read " + filename + "!");
-                glDeleteObjectARB(vertShader);
-                return 0;
             }
-
-            try {
-                reader.close();
-            } catch (Exception e) {
-                System.out.println("Couldn't close " + filename + "!");
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.out.println("Couldn't read " + filename + ":\n" + e);
+            glDeleteObjectARB(vertShader);
+            return 0;
         }
 
         glShaderSourceARB(vertShader, vertexCode);
@@ -737,55 +739,50 @@ public class Shaders {
         return vertShader;
     }
 
-    private static int createFragShader(String filename) {
+    private static int createFragShader(ZipFile zipFile, String filename) {
+        ZipEntry zipEntry = zipFile.getEntry(filename);
+        if (zipEntry == null) {
+            return 0;
+        }
+
         int fragShader = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-        if (fragShader == 0) return 0;
+        if (fragShader == 0) {
+            return 0;
+        }
+
         StringBuilder fragCode = new StringBuilder();
-        String line;
-
-        try (ZipFile zipFile = new ZipFile(new File(shaderPacksDir, currentShaderName))) {
-            BufferedReader reader;
-            try {
-                reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipFile.getEntry(filename))));
-                while ((line = reader.readLine()) != null) {
-                    fragCode.append(line).append("\n");
-                    if (colorAttachments < 5 && line.matches("uniform [ _a-zA-Z0-9]+ gaux1;.*")) colorAttachments = 5;
-                    else if (colorAttachments < 6 && line.matches("uniform [ _a-zA-Z0-9]+ gaux2;.*"))
-                        colorAttachments = 6;
-                    else if (colorAttachments < 7 && line.matches("uniform [ _a-zA-Z0-9]+ gaux3;.*"))
-                        colorAttachments = 7;
-                    else if (colorAttachments < 8 && line.matches("uniform [ _a-zA-Z0-9]+ shadow;.*")) {
-                        shadowPassInterval = 1;
-                        colorAttachments = 8;
-                    } else if (line.matches("/\\* SHADOWRES:[0-9]+ \\*/.*")) {
-                        String[] parts = line.split("([: ])", 4);
-                        shadowMapWidth = shadowMapHeight = Math.round(Integer.parseInt(parts[2]) * configShadowResMul);
-                        System.out.println("Shadow map resolution: " + shadowMapWidth);
-                    } else if (line.matches("/\\* SHADOWFOV:[0-9.]+ \\*/.*")) {
-                        String[] parts = line.split("([: ])", 4);
-                        System.out.println("Shadow map field of view: " + parts[2]);
-                        shadowMapFOV = Float.parseFloat(parts[2]);
-                        shadowMapIsOrtho = false;
-                    } else if (line.matches("/\\* SHADOWHPL:[0-9.]+ \\*/.*")) {
-                        String[] parts = line.split("([: ])", 4);
-                        System.out.println("Shadow map half-plane: " + parts[2]);
-                        shadowMapHalfPlane = Float.parseFloat(parts[2]);
-                        shadowMapIsOrtho = true;
-                    }
+        try (var reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipEntry)))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                fragCode.append(line).append("\n");
+                if (colorAttachments < 5 && line.matches("uniform [ _a-zA-Z0-9]+ gaux1;.*")) colorAttachments = 5;
+                else if (colorAttachments < 6 && line.matches("uniform [ _a-zA-Z0-9]+ gaux2;.*"))
+                    colorAttachments = 6;
+                else if (colorAttachments < 7 && line.matches("uniform [ _a-zA-Z0-9]+ gaux3;.*"))
+                    colorAttachments = 7;
+                else if (colorAttachments < 8 && line.matches("uniform [ _a-zA-Z0-9]+ shadow;.*")) {
+                    shadowPassInterval = 1;
+                    colorAttachments = 8;
+                } else if (line.matches("/\\* SHADOWRES:[0-9]+ \\*/.*")) {
+                    String[] parts = line.split("([: ])", 4);
+                    shadowMapWidth = shadowMapHeight = Math.round(Integer.parseInt(parts[2]) * configShadowResMul);
+                    System.out.println("Shadow map resolution: " + shadowMapWidth);
+                } else if (line.matches("/\\* SHADOWFOV:[0-9.]+ \\*/.*")) {
+                    String[] parts = line.split("([: ])", 4);
+                    System.out.println("Shadow map field of view: " + parts[2]);
+                    shadowMapFOV = Float.parseFloat(parts[2]);
+                    shadowMapIsOrtho = false;
+                } else if (line.matches("/\\* SHADOWHPL:[0-9.]+ \\*/.*")) {
+                    String[] parts = line.split("([: ])", 4);
+                    System.out.println("Shadow map half-plane: " + parts[2]);
+                    shadowMapHalfPlane = Float.parseFloat(parts[2]);
+                    shadowMapIsOrtho = true;
                 }
-            } catch (Exception e) {
-                System.out.println("Couldn't read " + filename + "!");
-                glDeleteObjectARB(fragShader);
-                return 0;
             }
-
-            try {
-                reader.close();
-            } catch (Exception e) {
-                System.out.println("Couldn't close " + filename + "!");
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.out.println("Couldn't read " + filename + ":\n" + e);
+            glDeleteObjectARB(fragShader);
+            return 0;
         }
 
         glShaderSourceARB(fragShader, fragCode);
