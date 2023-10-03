@@ -5,6 +5,7 @@ package net.mine_diver.macula;
 import net.fabricmc.loader.api.FabricLoader;
 import net.mine_diver.macula.option.ShaderOption;
 import net.mine_diver.macula.util.MinecraftInstance;
+import net.mine_diver.macula.wrappers.ShaderProgram;
 import net.minecraft.block.BlockBase;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Living;
@@ -19,6 +20,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.zip.ZipEntry;
@@ -143,7 +145,7 @@ public class Shaders {
         ProgramNone,            // final
     };
 
-    private static final int[] programs = new int[ProgramCount];
+    private static final ShaderProgram[] programs = new ShaderProgram[ProgramCount];
 
     // shaderpack fields
 
@@ -169,6 +171,8 @@ public class Shaders {
             if (!configDir.mkdirs())
                 throw new RuntimeException();
         loadConfig();
+
+        Arrays.fill(programs, ShaderProgram.empty);
     }
 
     private Shaders() {
@@ -191,15 +195,18 @@ public class Shaders {
                 throw new RuntimeException(e);
             }
             for (int i = 0; i < ProgramCount; ++i)
-                if (programNames[i].equals("")) programs[i] = 0;
+                if (programNames[i].equals(""))
+                    programs[i] = ShaderProgram.empty;
                 else
-                    programs[i] = setupProgram((containsFolder ? "shaders/" : "") + programNames[i] + ".vsh", (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
+                    programs[i] = setupProgram(
+                        (containsFolder ? "shaders/" : "") + programNames[i] + ".vsh",
+                        (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
         }
 
         if (colorAttachments > maxDrawBuffers) System.out.println("Not enough draw buffers!");
 
         for (int i = 0; i < ProgramCount; ++i)
-            for (int n = i; programs[i] == 0; n = programBackups[n]) {
+            for (int n = i; programs[i].isEmpty(); n = programBackups[n]) {
                 if (n == programBackups[n]) break;
                 programs[i] = programs[programBackups[n]];
             }
@@ -216,11 +223,10 @@ public class Shaders {
     }
 
     public static void destroy() {
-        for (int i = 0; i < ProgramCount; ++i)
-            if (programs[i] != 0) {
-                glDeleteObjectARB(programs[i]);
-                programs[i] = 0;
-            }
+        for (int i = 0; i < ProgramCount; ++i) {
+            programs[i].destroy();
+            programs[i] = ShaderProgram.empty;
+        }
     }
 
     public static void glEnableWrapper(int cap) {
@@ -229,7 +235,7 @@ public class Shaders {
             if (activeProgram == ProgramBasic) useProgram(ProgramTextured);
         } else if (cap == GL_FOG) {
             fogEnabled = true;
-            setProgramUniform1i("fogMode", glGetInteger(GL_FOG_MODE));
+            programs[activeProgram].uniform_fogMode.set1i(glGetInteger(GL_FOG_MODE));
         }
     }
 
@@ -239,7 +245,7 @@ public class Shaders {
             if (activeProgram == ProgramTextured || activeProgram == ProgramTexturedLit) useProgram(ProgramBasic);
         } else if (cap == GL_FOG) {
             fogEnabled = false;
-            setProgramUniform1i("fogMode", 0);
+            programs[activeProgram].uniform_fogMode.set1i(0);
         }
     }
 
@@ -545,7 +551,7 @@ public class Shaders {
         setupShadowFrameBuffer();
     }
 
-    private static int setupProgram(String vShaderPath, String fShaderPath) {
+    private static ShaderProgram setupProgram(String vShaderPath, String fShaderPath) {
         int program = glCreateProgramObjectARB();
 
         int vShader = 0;
@@ -563,95 +569,77 @@ public class Shaders {
             glLinkProgramARB(program);
             glValidateProgramARB(program);
             printLogInfo(program, vShaderPath + " + " + fShaderPath);
-        } else if (program != 0) {
-            glDeleteObjectARB(program);
-            program = 0;
+
+            if (glGetProgrami(program, GL_LINK_STATUS) == GL_TRUE) {
+                return new ShaderProgram(program);
+            }
         }
 
-        return program;
+        if (program != 0) {
+            glDeleteObjectARB(program);
+        }
+        return ShaderProgram.empty;
     }
 
     public static void useProgram(int program) {
         if (activeProgram == program) return;
         else if (isShadowPass) {
             activeProgram = ProgramNone;
-            glUseProgramObjectARB(programs[ProgramNone]);
+            programs[ProgramNone].use();
             return;
         }
         activeProgram = program;
-        glUseProgramObjectARB(programs[program]);
-        if (programs[program] == 0) return;
-        else if (program == ProgramTextured) setProgramUniform1i("texture", 0);
-        else if (program == ProgramTexturedLit || program == ProgramHand || program == ProgramWeather) {
-            setProgramUniform1i("texture", 0);
-            setProgramUniform1i("lightmap", 1);
+        ShaderProgram p = programs[program];
+        p.use();
+        if (p.isEmpty()) return;
+        else if (program == ProgramTextured) {
+            p.uniform_texture.set1i(0);
+        } else if (program == ProgramTexturedLit || program == ProgramHand || program == ProgramWeather) {
+            p.uniform_texture.set1i(0);
+            p.uniform_lightmap.set1i(1);
         } else if (program == ProgramTerrain || program == ProgramWater) {
-            setProgramUniform1i("texture", 0);
-            setProgramUniform1i("lightmap", 1);
-            setProgramUniform1i("normals", 2);
-            setProgramUniform1i("specular", 3);
+            p.uniform_texture.set1i(0);
+            p.uniform_lightmap.set1i(1);
+            p.uniform_normals.set1i(2);
+            p.uniform_specular.set1i(3);
         } else if (program == ProgramComposite || program == ProgramFinal) {
-            setProgramUniform1i("gcolor", 0);
-            setProgramUniform1i("gdepth", 1);
-            setProgramUniform1i("gnormal", 2);
-            setProgramUniform1i("composite", 3);
-            setProgramUniform1i("gaux1", 4);
-            setProgramUniform1i("gaux2", 5);
-            setProgramUniform1i("gaux3", 6);
-            setProgramUniform1i("shadow", 7);
-            setProgramUniformMatrix4ARB("gbufferPreviousProjection", false, previousProjection);
-            setProgramUniformMatrix4ARB("gbufferProjection", false, projection);
-            setProgramUniformMatrix4ARB("gbufferProjectionInverse", false, projectionInverse);
-            setProgramUniformMatrix4ARB("gbufferPreviousModelView", false, previousModelView);
+            p.uniform_gcolor.set1i(0);
+            p.uniform_gdepth.set1i(1);
+            p.uniform_gnormal.set1i(2);
+            p.uniform_composite.set1i(3);
+            p.uniform_gaux1.set1i(4);
+            p.uniform_gaux2.set1i(5);
+            p.uniform_gaux3.set1i(6);
+            p.uniform_shadow.set1i(7);
+            p.uniform_gbufferPreviousProjection.setMat4(false, previousProjection);
+            p.uniform_gbufferProjection.setMat4(false, projection);
+            p.uniform_gbufferProjectionInverse.setMat4(false, projectionInverse);
+            p.uniform_gbufferPreviousModelView.setMat4(false, previousModelView);
             if (shadowPassInterval > 0) {
-                setProgramUniformMatrix4ARB("shadowProjection", false, shadowProjection);
-                setProgramUniformMatrix4ARB("shadowProjectionInverse", false, shadowProjectionInverse);
-                setProgramUniformMatrix4ARB("shadowModelView", false, shadowModelView);
-                setProgramUniformMatrix4ARB("shadowModelViewInverse", false, shadowModelViewInverse);
+                p.uniform_shadowProjection.setMat4(false, shadowProjection);
+                p.uniform_shadowProjectionInverse.setMat4(false, shadowProjectionInverse);
+                p.uniform_shadowModelView.setMat4(false, shadowModelView);
+                p.uniform_shadowModelViewInverse.setMat4(false, shadowModelViewInverse);
             }
         }
         Minecraft minecraft = MinecraftInstance.get();
         ItemInstance stack = minecraft.player.inventory.getHeldItem();
-        setProgramUniform1i("heldItemId", (stack == null ? -1 : stack.itemId));
-        setProgramUniform1i("heldBlockLightValue", (stack == null || stack.itemId >= BlockBase.BY_ID.length ? 0 : BlockBase.EMITTANCE[stack.itemId]));
-        setProgramUniform1i("fogMode", (fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
-        setProgramUniform1f("rainStrength", rainStrength);
-        setProgramUniform1i("worldTime", (int) (minecraft.level.getLevelTime() % 24000L));
-        setProgramUniform1f("aspectRatio", (float) renderWidth / (float) renderHeight);
-        setProgramUniform1f("viewWidth", (float) renderWidth);
-        setProgramUniform1f("viewHeight", (float) renderHeight);
-        setProgramUniform1f("near", 0.05F);
-        setProgramUniform1f("far", 256 >> minecraft.options.viewDistance);
-        setProgramUniform3f("sunPosition", sunPosition[0], sunPosition[1], sunPosition[2]);
-        setProgramUniform3f("moonPosition", moonPosition[0], moonPosition[1], moonPosition[2]);
-        setProgramUniform3f("previousCameraPosition", (float) previousCameraPosition[0], (float) previousCameraPosition[1], (float) previousCameraPosition[2]);
-        setProgramUniform3f("cameraPosition", (float) cameraPosition[0], (float) cameraPosition[1], (float) cameraPosition[2]);
-        setProgramUniformMatrix4ARB("gbufferModelView", false, modelView);
-        setProgramUniformMatrix4ARB("gbufferModelViewInverse", false, modelViewInverse);
-    }
-
-    public static void setProgramUniform1i(String name, int x) {
-        if (activeProgram == ProgramNone) return;
-        int uniform = glGetUniformLocationARB(programs[activeProgram], name);
-        glUniform1iARB(uniform, x);
-    }
-
-    public static void setProgramUniform1f(String name, float x) {
-        if (activeProgram == ProgramNone) return;
-        int uniform = glGetUniformLocationARB(programs[activeProgram], name);
-        glUniform1fARB(uniform, x);
-    }
-
-    public static void setProgramUniform3f(String name, float x, float y, float z) {
-        if (activeProgram == ProgramNone) return;
-        int uniform = glGetUniformLocationARB(programs[activeProgram], name);
-        glUniform3fARB(uniform, x, y, z);
-    }
-
-    public static void setProgramUniformMatrix4ARB(String name, boolean transpose, FloatBuffer matrix) {
-        if (activeProgram == ProgramNone || matrix == null) return;
-        int uniform = glGetUniformLocation(programs[activeProgram], name);
-        glUniformMatrix4ARB(uniform, transpose, matrix);
+        p.uniform_heldItemId.set1i((stack == null ? -1 : stack.itemId));
+        p.uniform_heldBlockLightValue.set1i((stack == null || stack.itemId >= BlockBase.BY_ID.length ? 0 : BlockBase.EMITTANCE[stack.itemId]));
+        p.uniform_fogMode.set1i((fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
+        p.uniform_rainStrength.set1f(rainStrength);
+        p.uniform_worldTime.set1i((int) (minecraft.level.getLevelTime() % 24000L));
+        p.uniform_aspectRatio.set1f((float) renderWidth / (float) renderHeight);
+        p.uniform_viewWidth.set1f((float) renderWidth);
+        p.uniform_viewHeight.set1f((float) renderHeight);
+        p.uniform_near.set1f(0.05F);
+        p.uniform_far.set1f(256 >> minecraft.options.viewDistance);
+        p.uniform_sunPosition.set3f(sunPosition[0], sunPosition[1], sunPosition[2]);
+        p.uniform_moonPosition.set3f(moonPosition[0], moonPosition[1], moonPosition[2]);
+        p.uniform_previousCameraPosition.set3f((float) previousCameraPosition[0], (float) previousCameraPosition[1], (float) previousCameraPosition[2]);
+        p.uniform_cameraPosition.set3f((float) cameraPosition[0], (float) cameraPosition[1], (float) cameraPosition[2]);
+        p.uniform_gbufferModelView.setMat4(false, modelView);
+        p.uniform_gbufferModelViewInverse.setMat4(false, modelViewInverse);
     }
 
     public static void setCelestialPosition() {
@@ -743,7 +731,7 @@ public class Shaders {
 
         glShaderSourceARB(vertShader, vertexCode);
         glCompileShaderARB(vertShader);
-        if(!printLogInfo(vertShader, filename)) {
+        if (!printLogInfo(vertShader, filename)) {
             System.out.println("Source for \"" + filename + "\":\n" + vertexCode);
         }
         return vertShader;
