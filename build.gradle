@@ -1,5 +1,5 @@
 plugins {
-	id 'babric-loom' version '1.1-SNAPSHOT'
+	id 'babric-loom' version '1.4-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -26,34 +26,12 @@ repositories {
 		name = 'Glass Releases'
 		url = 'https://maven.glass-launcher.net/releases'
 	}
-	// Used for StationAPI and HowManyItems.
-	maven {
-		name = 'Glass Snapshots'
-		url = 'https://maven.glass-launcher.net/snapshots'
-	}
-	// Used for a StationAPI dependency.
-	maven {
-		name = 'Froge'
-		url 'https://maven.minecraftforge.net/'
-	}
 	// Used for projects that do not have a maven repository, but do have a GitHub repository with working build scripts.
 	maven {
 		name = 'Jitpack'
 		url = 'https://jitpack.io'
 	}
-	// Used for another StationAPI dependency
-	exclusiveContent {
-		forRepository {
-			maven {
-				name = "Modrinth"
-				url = "https://api.modrinth.com/maven"
-			}
-		}
-		filter {
-			includeGroup "maven.modrinth"
-		}
-	}
-	mavenCentral()
+	mavenLocal()
 }
 
 dependencies {
