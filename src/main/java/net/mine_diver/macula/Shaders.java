@@ -12,6 +12,7 @@ import net.minecraft.entity.Living;
 import net.minecraft.item.ItemInstance;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.slf4j.Logger;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -162,13 +163,19 @@ public class Shaders {
     public static final File
         configDir = FabricLoader.getInstance().getConfigDir().resolve("macula").toFile(),
         shaderConfigFile = new File(configDir, "shaders.properties");
+
     public static final Properties shadersConfig = new Properties();
+
     public static float configShadowResMul = 1;
 
+    private static final Logger logger = MaculaMod.LOGGER;
+
     static {
-        if (!configDir.exists())
-            if (!configDir.mkdirs())
-                throw new RuntimeException();
+        if (!configDir.exists()) {
+            if (!configDir.mkdirs()) {
+                logger.warn("Failed to create config directory \"{}\".", configDir);
+            }
+        }
         loadConfig();
 
         Arrays.fill(programs, ShaderProgram.empty);
@@ -181,7 +188,7 @@ public class Shaders {
         if (!(shaderPackLoaded = !currentShaderName.equals("OFF"))) return;
         int maxDrawBuffers = glGetInteger(GL_MAX_DRAW_BUFFERS);
 
-        System.out.println("GL_MAX_DRAW_BUFFERS = " + maxDrawBuffers);
+        logger.info("GL_MAX_DRAW_BUFFERS = {}", maxDrawBuffers);
 
         colorAttachments = 4;
 
@@ -200,12 +207,14 @@ public class Shaders {
                             (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
                     }
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+            } catch (IOException ex) {
+                logger.error("Failed to initialize shaderpack \"{}\": ", currentShaderName, ex);
             }
         }
 
-        if (colorAttachments > maxDrawBuffers) System.out.println("Not enough draw buffers!");
+        if (colorAttachments > maxDrawBuffers) {
+            logger.error("Not enough draw buffers! ({} requested vs {} supported)", colorAttachments, maxDrawBuffers);
+        }
 
         for (int i = 0; i < ProgramCount; ++i)
             for (int n = i; programs[i].isEmpty(); n = programBackups[n]) {
@@ -726,15 +735,15 @@ public class Shaders {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Couldn't read " + filename + ":\n" + e);
             glDeleteObjectARB(vertShader);
+            logger.error("Failed to read vertex shader \"{}\": ", filename, e);
             return 0;
         }
 
         glShaderSourceARB(vertShader, vertexCode);
         glCompileShaderARB(vertShader);
         if (!printLogInfo(vertShader, filename)) {
-            System.out.println("Source for \"" + filename + "\":\n" + vertexCode);
+            logger.trace("Source for vertex shader \"{}\": \n{}", filename, vertexCode);
         }
         return vertShader;
     }
@@ -766,29 +775,29 @@ public class Shaders {
                 } else if (line.matches("/\\* SHADOWRES:[0-9]+ \\*/.*")) {
                     String[] parts = line.split("([: ])", 4);
                     shadowMapWidth = shadowMapHeight = Math.round(Integer.parseInt(parts[2]) * configShadowResMul);
-                    System.out.println("Shadow map resolution: " + shadowMapWidth);
+                    logger.info("Shadow map resolution: {}", shadowMapWidth);
                 } else if (line.matches("/\\* SHADOWFOV:[0-9.]+ \\*/.*")) {
                     String[] parts = line.split("([: ])", 4);
-                    System.out.println("Shadow map field of view: " + parts[2]);
+                    logger.info("Shadow map field of view: {}", parts[2]);
                     shadowMapFOV = Float.parseFloat(parts[2]);
                     shadowMapIsOrtho = false;
                 } else if (line.matches("/\\* SHADOWHPL:[0-9.]+ \\*/.*")) {
                     String[] parts = line.split("([: ])", 4);
-                    System.out.println("Shadow map half-plane: " + parts[2]);
+                    logger.info("Shadow map half-plane: {}", parts[2]);
                     shadowMapHalfPlane = Float.parseFloat(parts[2]);
                     shadowMapIsOrtho = true;
                 }
             }
-        } catch (Exception e) {
-            System.out.println("Couldn't read " + filename + ":\n" + e);
+        } catch (Exception ex) {
             glDeleteObjectARB(fragShader);
+            logger.error("Failed to read frag shader \"{}\":", filename, ex);
             return 0;
         }
 
         glShaderSourceARB(fragShader, fragCode);
         glCompileShaderARB(fragShader);
         if (!printLogInfo(fragShader, filename)) {
-            System.out.println("Source for \"" + filename + "\":\n" + fragCode);
+            logger.trace("Source for frag shader \"{}\": \n{}", filename, fragCode);
         }
         return fragShader;
     }
@@ -803,7 +812,7 @@ public class Shaders {
             iVal.flip();
             glGetInfoLogARB(obj, iVal, infoLog);
             CharBuffer out = StandardCharsets.UTF_8.decode(infoLog);
-            System.out.println("Info log for \"" + fileName + "\":\n" + out);
+            logger.warn("Info log for \"{}\": \n{}", fileName, out);
             return false;
         }
         return true;
@@ -838,8 +847,9 @@ public class Shaders {
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, dfbDepthBuffer);
 
         int status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-        if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
-            System.out.println("Failed creating framebuffer! (Status " + status + ")");
+        if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+            logger.error("Failed creating framebuffer! (Status {})", status);
+        }
     }
 
     private static void setupShadowFrameBuffer() {
@@ -863,8 +873,9 @@ public class Shaders {
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, sfbDepthTexture, 0);
 
         int status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-        if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
-            System.out.println("Failed creating shadow framebuffer! (Status " + status + ")");
+        if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+            logger.error("Failed creating shadow framebuffer! (Status {})", status);
+        }
     }
 
     private static void setupRenderTextures() {
@@ -928,7 +939,8 @@ public class Shaders {
                     }
                 } else if (file1.isFile() && s.toLowerCase().endsWith(".zip")) zipShaders.add(s);
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            logger.error("Failed to access shaderpacks: ", ex);
         }
 
         folderShaders.sort(String.CASE_INSENSITIVE_ORDER);
@@ -943,8 +955,11 @@ public class Shaders {
 
     public static void loadConfig() {
         try {
-            if (!shaderPacksDir.exists()) shaderPacksDir.mkdir();
-        } catch (Exception ignored) {
+            if (!shaderPacksDir.exists()) {
+                shaderPacksDir.mkdir();
+            }
+        } catch (Exception ex) {
+            logger.warn("Failed to create shaderpacks directory \"{}\": ", shaderPacksDir, ex);
         }
 
         shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), "");
@@ -952,12 +967,12 @@ public class Shaders {
         if (shaderConfigFile.exists())
             try (FileReader filereader = new FileReader(shaderConfigFile)) {
                 shadersConfig.load(filereader);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                logger.warn("Failed to read config file \"{}\": ", shaderConfigFile, ex);
             }
 
-        if (!shaderConfigFile.exists()) try {
+        if (!shaderConfigFile.exists()) {
             storeConfig();
-        } catch (Exception ignored) {
         }
 
         for (ShaderOption option : ShaderOption.values())
@@ -967,14 +982,17 @@ public class Shaders {
     }
 
     private static void setEnumShaderOption(ShaderOption eso, String str) {
-        if (str == null) str = eso.getValueDefault();
+        if (str == null) {
+            str = eso.getValueDefault();
+        }
 
         switch (eso) {
             case SHADOW_RES_MUL -> {
                 try {
                     configShadowResMul = Float.parseFloat(str);
-                } catch (NumberFormatException e) {
+                } catch (NumberFormatException ex) {
                     configShadowResMul = 1;
+                    logger.warn("Failed to parse shader enum option \"{}\": ", str, ex);
                 }
             }
             case SHADER_PACK -> currentShaderName = str;
@@ -983,13 +1001,14 @@ public class Shaders {
     }
 
     public static void storeConfig() {
-
-        for (ShaderOption enumshaderoption : ShaderOption.values())
+        for (ShaderOption enumshaderoption : ShaderOption.values()) {
             shadersConfig.setProperty(enumshaderoption.getPropertyKey(), getEnumShaderOption(enumshaderoption));
+        }
 
         try (FileWriter filewriter = new FileWriter(shaderConfigFile)) {
             shadersConfig.store(filewriter, null);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            logger.warn("Failed to write config file \"{}\": ", shaderConfigFile, ex);
         }
     }
 
