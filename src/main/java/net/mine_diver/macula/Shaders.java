@@ -4,6 +4,7 @@ package net.mine_diver.macula;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.mine_diver.macula.option.ShaderOption;
+import net.mine_diver.macula.sources.*;
 import net.mine_diver.macula.util.MinecraftInstance;
 import net.mine_diver.macula.wrappers.ShaderProgram;
 import net.minecraft.block.BlockBase;
@@ -20,12 +21,8 @@ import java.nio.CharBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.util.*;
+import java.util.stream.Stream;
 
 import static org.lwjgl.opengl.ARBFragmentShader.GL_FRAGMENT_SHADER_ARB;
 import static org.lwjgl.opengl.ARBShaderObjects.*;
@@ -150,7 +147,7 @@ public class Shaders {
     // shaderpack fields
 
     public static final File shaderPacksDir = FabricLoader.getInstance().getGameDir().resolve("shaderpacks").toFile();
-    public static String currentShaderName = "OFF";
+    public static ShaderpackSource currentShaderSource = NullShaderpackSource.instance;
     public static boolean shaderPackLoaded = false;
 
     // debug info
@@ -185,30 +182,31 @@ public class Shaders {
     }
 
     public static void init() {
-        if (!(shaderPackLoaded = !currentShaderName.equals("OFF"))) return;
-        int maxDrawBuffers = glGetInteger(GL_MAX_DRAW_BUFFERS);
+        shaderPackLoaded = !(currentShaderSource instanceof NullShaderpackSource);
+        if (!shaderPackLoaded) {
+            return;
+        }
 
+        int maxDrawBuffers = glGetInteger(GL_MAX_DRAW_BUFFERS);
         logger.info("GL_MAX_DRAW_BUFFERS = {}", maxDrawBuffers);
 
         colorAttachments = 4;
 
-        if (!currentShaderName.equals("(internal)")) {
-            try (ZipFile zipFile = new ZipFile(new File(shaderPacksDir, currentShaderName))) {
-                ZipEntry zipEntry = zipFile.getEntry("shaders");
-                boolean containsFolder = zipEntry != null && zipEntry.isDirectory();
+        if (currentShaderSource instanceof ShaderpackFileSource fileSource) {
+            String shadersDir = "shaders/";
+            if (!fileSource.isDirectory(shadersDir)) {
+                shadersDir = "";
+            }
 
-                for (int i = 0; i < ProgramCount; ++i) {
-                    if (programNames[i].equals("")) {
-                        programs[i] = ShaderProgram.empty;
-                    } else {
-                        programs[i] = setupProgram(
-                            zipFile,
-                            (containsFolder ? "shaders/" : "") + programNames[i] + ".vsh",
-                            (containsFolder ? "shaders/" : "") + programNames[i] + ".fsh");
-                    }
+            for (int i = 0; i < ProgramCount; ++i) {
+                if (programNames[i].equals("")) {
+                    programs[i] = ShaderProgram.empty;
+                } else {
+                    programs[i] = setupProgram(
+                        fileSource,
+                        shadersDir + programNames[i] + ".vsh",
+                        shadersDir + programNames[i] + ".fsh");
                 }
-            } catch (IOException ex) {
-                logger.error("Failed to initialize shaderpack \"{}\": ", currentShaderName, ex);
             }
         }
 
@@ -216,16 +214,19 @@ public class Shaders {
             logger.error("Not enough draw buffers! ({} requested vs {} supported)", colorAttachments, maxDrawBuffers);
         }
 
-        for (int i = 0; i < ProgramCount; ++i)
+        for (int i = 0; i < ProgramCount; ++i) {
             for (int n = i; programs[i].isEmpty(); n = programBackups[n]) {
                 if (n == programBackups[n]) {
                     break;
                 }
                 programs[i] = programs[programBackups[n]];
             }
+        }
 
         dfbDrawBuffers = BufferUtils.createIntBuffer(colorAttachments);
-        for (int i = 0; i < colorAttachments; ++i) dfbDrawBuffers.put(i, GL_COLOR_ATTACHMENT0_EXT + i);
+        for (int i = 0; i < colorAttachments; ++i) {
+            dfbDrawBuffers.put(i, GL_COLOR_ATTACHMENT0_EXT + i);
+        }
 
         dfbTextures = BufferUtils.createIntBuffer(colorAttachments);
         dfbRenderBuffers = BufferUtils.createIntBuffer(colorAttachments);
@@ -570,15 +571,15 @@ public class Shaders {
         setupShadowFrameBuffer();
     }
 
-    private static ShaderProgram setupProgram(ZipFile zipFile, String vShaderPath, String fShaderPath) {
+    private static ShaderProgram setupProgram(ShaderpackFileSource source, String vShaderPath, String fShaderPath) {
         int program = glCreateProgramObjectARB();
 
         int vShader = 0;
         int fShader = 0;
 
         if (program != 0) {
-            vShader = createVertShader(zipFile, vShaderPath);
-            fShader = createFragShader(zipFile, fShaderPath);
+            vShader = createVertShader(source, vShaderPath);
+            fShader = createFragShader(source, fShaderPath);
         }
 
         if (vShader != 0 || fShader != 0) {
@@ -714,9 +715,9 @@ public class Shaders {
         }
     }
 
-    private static int createVertShader(ZipFile zipFile, String filename) {
-        ZipEntry zipEntry = zipFile.getEntry(filename);
-        if (zipEntry == null) {
+    private static int createVertShader(ShaderpackFileSource source, String filename) {
+        InputStream stream = source.getInputStream(filename);
+        if (stream == null) {
             return 0;
         }
 
@@ -725,8 +726,8 @@ public class Shaders {
             return 0;
         }
 
-        StringBuilder vertexCode = new StringBuilder();
-        try (var reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipEntry)))) {
+        var vertexCode = new StringBuilder();
+        try (var reader = new BufferedReader(new InputStreamReader(stream))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 vertexCode.append(line).append("\n");
@@ -734,23 +735,23 @@ public class Shaders {
                     entityAttrib = 10;
                 }
             }
-        } catch (Exception e) {
+        } catch (Exception ex) {
             glDeleteObjectARB(vertShader);
-            logger.error("Failed to read vertex shader \"{}\": ", filename, e);
+            logger.error("Failed to read vertex shader \"{}\": ", filename, ex);
             return 0;
         }
 
         glShaderSourceARB(vertShader, vertexCode);
         glCompileShaderARB(vertShader);
-        if (!printLogInfo(vertShader, filename)) {
+        if (printLogInfo(vertShader, filename)) {
             logger.trace("Source for vertex shader \"{}\": \n{}", filename, vertexCode);
         }
         return vertShader;
     }
 
-    private static int createFragShader(ZipFile zipFile, String filename) {
-        ZipEntry zipEntry = zipFile.getEntry(filename);
-        if (zipEntry == null) {
+    private static int createFragShader(ShaderpackFileSource source, String filename) {
+        InputStream stream = source.getInputStream(filename);
+        if (stream == null) {
             return 0;
         }
 
@@ -759,8 +760,8 @@ public class Shaders {
             return 0;
         }
 
-        StringBuilder fragCode = new StringBuilder();
-        try (var reader = new BufferedReader(new InputStreamReader(zipFile.getInputStream(zipEntry)))) {
+        var fragCode = new StringBuilder();
+        try (var reader = new BufferedReader(new InputStreamReader(stream))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 fragCode.append(line).append("\n");
@@ -796,7 +797,7 @@ public class Shaders {
 
         glShaderSourceARB(fragShader, fragCode);
         glCompileShaderARB(fragShader);
-        if (!printLogInfo(fragShader, filename)) {
+        if (printLogInfo(fragShader, filename)) {
             logger.trace("Source for frag shader \"{}\": \n{}", filename, fragCode);
         }
         return fragShader;
@@ -813,9 +814,9 @@ public class Shaders {
             glGetInfoLogARB(obj, iVal, infoLog);
             CharBuffer out = StandardCharsets.UTF_8.decode(infoLog);
             logger.warn("Info log for \"{}\": \n{}", fileName, out);
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 
     private static void setupFrameBuffer() {
@@ -917,40 +918,47 @@ public class Shaders {
 
     // shaderpacks
 
-    public static List<String> listOfShaders() {
-        List<String> folderShaders = new ArrayList<>();
-        List<String> zipShaders = new ArrayList<>();
+    public static List<ShaderpackSource> listOfShaderpacks() {
+        var folderShaders = new ArrayList<ShaderpackDirSource>();
+        var zipShaders = new ArrayList<ShaderpackZipSource>();
 
         try {
-            if (!shaderPacksDir.exists()) //noinspection ResultOfMethodCallIgnored
+            if (!shaderPacksDir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
                 shaderPacksDir.mkdir();
+            } else {
+                String[] files = shaderPacksDir.list();
+                assert files != null;
 
-            File[] afile = shaderPacksDir.listFiles();
+                for (String filePath : files) {
+                    File file = new File(shaderPacksDir, filePath);
+                    String s = file.getName();
 
-            assert afile != null;
-            for (File file1 : afile) {
-                String s = file1.getName();
-
-                if (file1.isDirectory()) {
-                    if (!s.equals("debug")) {
-                        File file2 = new File(file1, "shaders");
-
-                        if (file2.exists() && file2.isDirectory()) folderShaders.add(s);
+                    if (file.isDirectory()) {
+                        if (!s.equals("debug")) {
+                            folderShaders.add(new ShaderpackDirSource(file));
+                        }
+                    } else if (file.isFile() && s.toLowerCase().endsWith(".zip")) {
+                        try {
+                            zipShaders.add(new ShaderpackZipSource(file));
+                        } catch (IOException ex) {
+                            logger.error("Failed to open shaderpack zip \"{}\": ", file, ex);
+                        }
                     }
-                } else if (file1.isFile() && s.toLowerCase().endsWith(".zip")) zipShaders.add(s);
+                }
             }
         } catch (Exception ex) {
             logger.error("Failed to access shaderpacks: ", ex);
         }
 
-        folderShaders.sort(String.CASE_INSENSITIVE_ORDER);
-        zipShaders.sort(String.CASE_INSENSITIVE_ORDER);
-        ArrayList<String> arraylist2 = new ArrayList<>();
-        arraylist2.add("OFF");
-        arraylist2.add("(internal)");
-        arraylist2.addAll(folderShaders);
-        arraylist2.addAll(zipShaders);
-        return arraylist2;
+        folderShaders.sort(Comparator.comparing(ShaderpackSource::getName, String.CASE_INSENSITIVE_ORDER));
+        zipShaders.sort(Comparator.comparing(ShaderpackSource::getName, String.CASE_INSENSITIVE_ORDER));
+        var packs = new ArrayList<ShaderpackSource>();
+        packs.add(NullShaderpackSource.instance);
+        packs.add(InternalShaderpackSource.instance);
+        packs.addAll(folderShaders);
+        packs.addAll(zipShaders);
+        return packs;
     }
 
     public static void loadConfig() {
@@ -975,27 +983,33 @@ public class Shaders {
             storeConfig();
         }
 
-        for (ShaderOption option : ShaderOption.values())
+        for (ShaderOption option : ShaderOption.values()) {
             setEnumShaderOption(option, shadersConfig.getProperty(option.getPropertyKey(), option.getValueDefault()));
-
-//        loadShaderPack();
+        }
+        //loadShaderPack();
     }
 
     private static void setEnumShaderOption(ShaderOption eso, String str) {
         if (str == null) {
             str = eso.getValueDefault();
         }
+        String valueStr = str;
 
         switch (eso) {
             case SHADOW_RES_MUL -> {
                 try {
-                    configShadowResMul = Float.parseFloat(str);
+                    configShadowResMul = Float.parseFloat(valueStr);
                 } catch (NumberFormatException ex) {
                     configShadowResMul = 1;
-                    logger.warn("Failed to parse shader enum option \"{}\": ", str, ex);
+                    logger.warn("Failed to parse shader option {} with value \"{}\": ", eso, valueStr, ex);
                 }
             }
-            case SHADER_PACK -> currentShaderName = str;
+            case SHADER_PACK -> {
+                List<ShaderpackSource> sources = listOfShaderpacks();
+                Stream<ShaderpackSource> filtered = sources.stream()
+                    .filter(src -> src.getName().equals(valueStr));
+                currentShaderSource = filtered.findFirst().orElse(null);
+            }
             default -> throw new IllegalArgumentException("Unknown option: " + eso);
         }
     }
@@ -1015,13 +1029,13 @@ public class Shaders {
     public static String getEnumShaderOption(ShaderOption eso) {
         return switch (eso) {
             case SHADOW_RES_MUL -> Float.toString(configShadowResMul);
-            case SHADER_PACK -> currentShaderName;
+            case SHADER_PACK -> currentShaderSource.getName();
         };
     }
 
-    public static void setShaderPack(String shaderPack) {
-        currentShaderName = shaderPack;
-        shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), shaderPack);
+    public static void setShaderPack(ShaderpackSource shaderPack) {
+        currentShaderSource = shaderPack;
+        shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), shaderPack.getName());
         loadShaderPack();
     }
 

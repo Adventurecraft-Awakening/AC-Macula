@@ -1,5 +1,6 @@
 package net.mine_diver.macula.gui;
 
+import net.mine_diver.macula.sources.ShaderpackSource;
 import net.mine_diver.macula.Shaders;
 import net.mine_diver.macula.mixin.ScrollableBaseAccessor;
 import net.minecraft.client.gui.widgets.ScrollableBase;
@@ -8,7 +9,7 @@ import net.minecraft.client.render.Tessellator;
 import java.util.List;
 
 class ScrollableShaders extends ScrollableBase {
-    private List<String> shaderslist;
+    private List<ShaderpackSource> shaderslist;
     private int selectedIndex;
     private final long lastClicked = Long.MIN_VALUE;
     private long lastClickedCached = 0L;
@@ -21,12 +22,12 @@ class ScrollableShaders extends ScrollableBase {
     }
 
     public void updateList() {
-        this.shaderslist = Shaders.listOfShaders();
+        this.shaderslist = Shaders.listOfShaderpacks();
         this.selectedIndex = 0;
         int i = 0;
 
         for (int j = this.shaderslist.size(); i < j; ++i) {
-            if (this.shaderslist.get(i).equals(Shaders.currentShaderName)) {
+            if (this.shaderslist.get(i).equals(Shaders.currentShaderSource)) {
                 this.selectedIndex = i;
                 break;
             }
@@ -60,14 +61,10 @@ class ScrollableShaders extends ScrollableBase {
 
     @Override
     protected void renderEntry(int index, int posX, int posY, int contentY, Tessellator tessellator) {
-        String s = this.shaderslist.get(index);
+        ShaderpackSource s = this.shaderslist.get(index);
 
-        if (s.equals("OFF")) {
-            s = "OFF";
-        } else if (s.equals("(internal)")) {
-            s = "(internal)";
-        }
+        String name = s.getName();
 
-        this.shadersGui.drawTextWithShadowCentred(shadersGui.getTextRenderer(), s, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
+        this.shadersGui.drawTextWithShadowCentred(shadersGui.getTextRenderer(), name, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
     }
 }
