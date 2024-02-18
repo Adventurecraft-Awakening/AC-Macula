@@ -12,6 +12,11 @@ public class ShaderpackDirSource extends ShaderpackFileSource {
     }
 
     @Override
+    public String getType() {
+        return "dir";
+    }
+
+    @Override
     public boolean isDirectory(String path) {
         File file = new File(rootPath, path);
         return file.isDirectory();

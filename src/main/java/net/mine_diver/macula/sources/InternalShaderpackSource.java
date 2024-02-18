@@ -6,6 +6,11 @@ public class InternalShaderpackSource extends ShaderpackSource {
 
     @Override
     public String getName() {
-        return "(internal)";
+        return getType() + TypeSeparator + "(internal)";
+    }
+
+    @Override
+    public String getType() {
+        return "internal";
     }
 }

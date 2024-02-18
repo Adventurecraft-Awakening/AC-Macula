@@ -1,15 +1,15 @@
 package net.mine_diver.macula.gui;
 
-import net.mine_diver.macula.sources.ShaderpackSource;
 import net.mine_diver.macula.Shaders;
 import net.mine_diver.macula.mixin.ScrollableBaseAccessor;
+import net.mine_diver.macula.sources.ShaderpackSource;
 import net.minecraft.client.gui.widgets.ScrollableBase;
 import net.minecraft.client.render.Tessellator;
 
 import java.util.List;
 
 class ScrollableShaders extends ScrollableBase {
-    private List<ShaderpackSource> shaderslist;
+    private List<String> shadersList;
     private int selectedIndex;
     private final long lastClicked = Long.MIN_VALUE;
     private long lastClickedCached = 0L;
@@ -22,12 +22,16 @@ class ScrollableShaders extends ScrollableBase {
     }
 
     public void updateList() {
-        this.shaderslist = Shaders.listOfShaderpacks();
+        var shaderpackSources = Shaders.listOfShaderpacks();
+        shadersList = shaderpackSources.stream().map(ShaderpackSource::getName).toList();
+        Shaders.closeListOfShaderpacks(shaderpackSources);
+
         this.selectedIndex = 0;
         int i = 0;
 
-        for (int j = this.shaderslist.size(); i < j; ++i) {
-            if (this.shaderslist.get(i).equals(Shaders.currentShaderSource)) {
+        String currentName = Shaders.getCurrentShaderSource().getName();
+        for (int j = this.shadersList.size(); i < j; ++i) {
+            if (this.shadersList.get(i).equals(currentName)) {
                 this.selectedIndex = i;
                 break;
             }
@@ -36,7 +40,7 @@ class ScrollableShaders extends ScrollableBase {
 
     @Override
     protected int getSize() {
-        return this.shaderslist.size();
+        return this.shadersList.size();
     }
 
     @Override
@@ -48,7 +52,8 @@ class ScrollableShaders extends ScrollableBase {
     private void selectIndex(int index) {
         this.selectedIndex = index;
         this.lastClickedCached = this.lastClicked;
-        Shaders.setShaderPack(this.shaderslist.get(index));
+        Shaders.setShaderPack(this.shadersList.get(index));
+        Shaders.loadShaderPack();
         shadersGui.updateButtons();
     }
 
@@ -57,14 +62,17 @@ class ScrollableShaders extends ScrollableBase {
         return index == this.selectedIndex;
     }
 
-    protected void renderBackground() {}
+    protected void renderBackground() {
+    }
 
     @Override
     protected void renderEntry(int index, int posX, int posY, int contentY, Tessellator tessellator) {
-        ShaderpackSource s = this.shaderslist.get(index);
+        String s = this.shadersList.get(index);
+        int separator = s.indexOf(ShaderpackSource.TypeSeparator);
+        if (separator != -1) {
+            s = s.substring(separator + ShaderpackSource.TypeSeparator.length());
+        }
 
-        String name = s.getName();
-
-        this.shadersGui.drawTextWithShadowCentred(shadersGui.getTextRenderer(), name, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
+        this.shadersGui.drawTextWithShadowCentred(shadersGui.getTextRenderer(), s, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
     }
 }

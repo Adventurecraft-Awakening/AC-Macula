@@ -1,12 +1,13 @@
 package net.mine_diver.macula.sources;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-public class ShaderpackZipSource extends ShaderpackFileSource {
+public class ShaderpackZipSource extends ShaderpackFileSource implements Closeable {
 
     private final ZipFile zipFile;
 
@@ -31,5 +32,24 @@ public class ShaderpackZipSource extends ShaderpackFileSource {
             }
         }
         return null;
+    }
+
+    @Override
+    public String getType() {
+        return "zip";
+    }
+
+    @Override
+    public String getName() {
+        String name = super.getName();
+        if (name.toLowerCase().endsWith(".zip")) {
+            return name.substring(0, name.length() - 4);
+        }
+        return name;
+    }
+
+    @Override
+    public void close() throws IOException {
+        zipFile.close();
     }
 }

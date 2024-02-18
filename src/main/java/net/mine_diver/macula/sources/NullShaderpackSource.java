@@ -6,6 +6,11 @@ public class NullShaderpackSource extends ShaderpackSource {
 
     @Override
     public String getName() {
-        return "OFF";
+        return getType() + TypeSeparator + "OFF";
+    }
+
+    @Override
+    public String getType() {
+        return "internal";
     }
 }

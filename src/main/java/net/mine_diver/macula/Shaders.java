@@ -147,7 +147,7 @@ public class Shaders {
     // shaderpack fields
 
     public static final File shaderPacksDir = FabricLoader.getInstance().getGameDir().resolve("shaderpacks").toFile();
-    public static ShaderpackSource currentShaderSource = NullShaderpackSource.instance;
+    private static ShaderpackSource currentShaderSource = NullShaderpackSource.instance;
     public static boolean shaderPackLoaded = false;
 
     // debug info
@@ -961,6 +961,20 @@ public class Shaders {
         return packs;
     }
 
+    public static void closeListOfShaderpacks(List<ShaderpackSource> sources) {
+        for (ShaderpackSource source : sources) {
+            closeShaderpack(source);
+        }
+    }
+
+    public static void closeShaderpack(ShaderpackSource source) {
+        try {
+            source.close();
+        } catch (IOException ex) {
+            MaculaMod.LOGGER.warn("Failed to close shaderpack source: ", ex);
+        }
+    }
+
     public static void loadConfig() {
         try {
             if (!shaderPacksDir.exists()) {
@@ -993,23 +1007,17 @@ public class Shaders {
         if (str == null) {
             str = eso.getValueDefault();
         }
-        String valueStr = str;
 
         switch (eso) {
             case SHADOW_RES_MUL -> {
                 try {
-                    configShadowResMul = Float.parseFloat(valueStr);
+                    configShadowResMul = Float.parseFloat(str);
                 } catch (NumberFormatException ex) {
                     configShadowResMul = 1;
-                    logger.warn("Failed to parse shader option {} with value \"{}\": ", eso, valueStr, ex);
+                    logger.warn("Failed to parse shader option {} with value \"{}\": ", eso, str, ex);
                 }
             }
-            case SHADER_PACK -> {
-                List<ShaderpackSource> sources = listOfShaderpacks();
-                Stream<ShaderpackSource> filtered = sources.stream()
-                    .filter(src -> src.getName().equals(valueStr));
-                currentShaderSource = filtered.findFirst().orElse(null);
-            }
+            case SHADER_PACK -> setShaderPack(str);
             default -> throw new IllegalArgumentException("Unknown option: " + eso);
         }
     }
@@ -1033,10 +1041,28 @@ public class Shaders {
         };
     }
 
-    public static void setShaderPack(ShaderpackSource shaderPack) {
-        currentShaderSource = shaderPack;
-        shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), shaderPack.getName());
-        loadShaderPack();
+    public static void setShaderPack(String shaderPackName) {
+        List<ShaderpackSource> sources = listOfShaderpacks();
+        Stream<ShaderpackSource> filtered = sources.stream()
+            .filter(src -> src.getName().equals(shaderPackName));
+        ShaderpackSource foundSource = filtered.findFirst().orElse(null);
+        setCurrentShaderSource(foundSource);
+        sources.remove(foundSource);
+        closeListOfShaderpacks(sources);
+    }
+
+    private static void setCurrentShaderSource(ShaderpackSource source) {
+        ShaderpackSource newSource = source != null ? source : NullShaderpackSource.instance;
+        if (currentShaderSource == newSource) {
+            return;
+        }
+        closeShaderpack(currentShaderSource);
+        currentShaderSource = newSource;
+        shadersConfig.setProperty(ShaderOption.SHADER_PACK.getPropertyKey(), newSource.getName());
+    }
+
+    public static ShaderpackSource getCurrentShaderSource() {
+        return currentShaderSource;
     }
 
     public static void loadShaderPack() {

@@ -19,6 +19,6 @@ public abstract class ShaderpackFileSource extends ShaderpackSource {
 
     @Override
     public String getName() {
-        return rootPath.getName();
+        return getType() + TypeSeparator + rootPath.getName();
     }
 }
