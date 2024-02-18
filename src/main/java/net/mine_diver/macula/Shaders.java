@@ -22,6 +22,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.lwjgl.opengl.ARBFragmentShader.GL_FRAGMENT_SHADER_ARB;
@@ -198,14 +199,20 @@ public class Shaders {
                 shadersDir = "";
             }
 
+            String programDir = shadersDir + "world0/";
+            if (!fileSource.isDirectory(programDir)) {
+                programDir = shadersDir;
+            }
+
             for (int i = 0; i < ProgramCount; ++i) {
                 if (programNames[i].equals("")) {
                     programs[i] = ShaderProgram.empty;
                 } else {
                     programs[i] = setupProgram(
                         fileSource,
-                        shadersDir + programNames[i] + ".vsh",
-                        shadersDir + programNames[i] + ".fsh");
+                        shadersDir,
+                        programDir + programNames[i] + ".vsh",
+                        programDir + programNames[i] + ".fsh");
                 }
             }
         }
@@ -571,15 +578,19 @@ public class Shaders {
         setupShadowFrameBuffer();
     }
 
-    private static ShaderProgram setupProgram(ShaderpackFileSource source, String vShaderPath, String fShaderPath) {
+    private static ShaderProgram setupProgram(
+        ShaderpackFileSource source,
+        String shadersDir,
+        String vShaderPath,
+        String fShaderPath) {
         int program = glCreateProgramObjectARB();
 
         int vShader = 0;
         int fShader = 0;
 
         if (program != 0) {
-            vShader = createVertShader(source, vShaderPath);
-            fShader = createFragShader(source, fShaderPath);
+            vShader = createVertShader(source, shadersDir, vShaderPath);
+            fShader = createFragShader(source, shadersDir, fShaderPath);
         }
 
         if (vShader != 0 || fShader != 0) {
@@ -715,29 +726,107 @@ public class Shaders {
         }
     }
 
-    private static int createVertShader(ShaderpackFileSource source, String filename) {
+    private static boolean processShaderFile(
+        ShaderpackFileSource source,
+        String shadersDir,
+        StringBuilder output,
+        String filename,
+        Consumer<String> onLine) throws IOException {
+
         InputStream stream = source.getInputStream(filename);
         if (stream == null) {
+            return false;
+        }
+
+        try (var reader = new BufferedReader(new InputStreamReader(stream))) {
+            int lineIndex = 0;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lineIndex++;
+                onLine.accept(line);
+
+                String stripped = line.stripLeading();
+                if (stripped.startsWith("#")) {
+                    if (stripped.startsWith("#include")) {
+                        processInclude(source, shadersDir, output, filename, onLine, line, lineIndex);
+                        continue;
+                    } else if (stripped.startsWith("#define")) {
+                    } else if (stripped.startsWith("#undef")) {
+                    } else if (stripped.startsWith("#if")) {
+                    } else if (stripped.startsWith("#ifdef")) {
+                    } else if (stripped.startsWith("#ifndef")) {
+                    } else if (stripped.startsWith("#else")) {
+                    } else if (stripped.startsWith("#elif")) {
+                    } else if (stripped.startsWith("#endif")) {
+                    } else if (stripped.startsWith("#error")) {
+                    } else if (stripped.startsWith("#pragma")) {
+                    } else if (stripped.startsWith("#extension")) {
+                    } else if (stripped.startsWith("#version")) {
+                    } else if (stripped.startsWith("#line")) {
+                        // TODO
+                    } else {
+                        logger.warn(
+                            "Unknown preprocessor directive \"{}\" in file \"{}\" at line {}.",
+                            line, filename, lineIndex);
+                    }
+                }
+                output.append(line).append("\n");
+            }
+        }
+        return true;
+    }
+
+    private static void processInclude(
+        ShaderpackFileSource source,
+        String shadersDir,
+        StringBuilder output,
+        String filename,
+        Consumer<String> onLine,
+        String line,
+        int lineIndex) throws IOException {
+
+        int firstQuote = line.indexOf("\"");
+        int secondQuote = line.indexOf("\"", firstQuote + 1);
+        if (secondQuote == -1) {
+            logger.warn(
+                "Malformed include directive \"{}\" in file \"{}\" at line {}.",
+                line, filename, lineIndex);
+            return;
+        }
+
+        String includeStr = line.substring(firstQuote + 1, secondQuote);
+        String includePath;
+        if (includeStr.startsWith("/")) {
+            includePath = shadersDir + includeStr.substring(1);
+        } else {
+            int lastFileSlash = filename.lastIndexOf("/");
+            includePath = filename.substring(0, lastFileSlash + 1) + includeStr;
+        }
+
+        if (!processShaderFile(source, shadersDir, output, includePath, onLine)) {
+            logger.warn(
+                "Missing file \"{}\" for include directive in file \"{}\" at line {}.",
+                includePath, filename, lineIndex);
+        }
+    }
+
+    private static int createVertShader(ShaderpackFileSource source, String shadersDir, String filename) {
+        var vertexCode = new StringBuilder();
+        try {
+            if (!processShaderFile(source, shadersDir, vertexCode, filename, (line) -> {
+                if (line.matches("attribute [_a-zA-Z0-9]+ mc_Entity.*")) {
+                    entityAttrib = 10;
+                }
+            })) {
+                return 0;
+            }
+        } catch (Exception ex) {
+            logger.error("Failed to read vertex shader \"{}\": ", filename, ex);
             return 0;
         }
 
         int vertShader = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
         if (vertShader == 0) {
-            return 0;
-        }
-
-        var vertexCode = new StringBuilder();
-        try (var reader = new BufferedReader(new InputStreamReader(stream))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                vertexCode.append(line).append("\n");
-                if (line.matches("attribute [_a-zA-Z0-9]+ mc_Entity.*")) {
-                    entityAttrib = 10;
-                }
-            }
-        } catch (Exception ex) {
-            glDeleteObjectARB(vertShader);
-            logger.error("Failed to read vertex shader \"{}\": ", filename, ex);
             return 0;
         }
 
@@ -749,22 +838,10 @@ public class Shaders {
         return vertShader;
     }
 
-    private static int createFragShader(ShaderpackFileSource source, String filename) {
-        InputStream stream = source.getInputStream(filename);
-        if (stream == null) {
-            return 0;
-        }
-
-        int fragShader = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-        if (fragShader == 0) {
-            return 0;
-        }
-
+    private static int createFragShader(ShaderpackFileSource source, String shadersDir, String filename) {
         var fragCode = new StringBuilder();
-        try (var reader = new BufferedReader(new InputStreamReader(stream))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                fragCode.append(line).append("\n");
+        try {
+            if (!processShaderFile(source, shadersDir, fragCode, filename, (line) -> {
                 if (colorAttachments < 5 && line.matches("uniform [ _a-zA-Z0-9]+ gaux1;.*")) colorAttachments = 5;
                 else if (colorAttachments < 6 && line.matches("uniform [ _a-zA-Z0-9]+ gaux2;.*"))
                     colorAttachments = 6;
@@ -788,10 +865,16 @@ public class Shaders {
                     shadowMapHalfPlane = Float.parseFloat(parts[2]);
                     shadowMapIsOrtho = true;
                 }
+            })) {
+                return 0;
             }
         } catch (Exception ex) {
-            glDeleteObjectARB(fragShader);
             logger.error("Failed to read frag shader \"{}\":", filename, ex);
+            return 0;
+        }
+
+        int fragShader = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
+        if (fragShader == 0) {
             return 0;
         }
 
