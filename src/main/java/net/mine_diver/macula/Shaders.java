@@ -7,10 +7,10 @@ import net.mine_diver.macula.option.ShaderOption;
 import net.mine_diver.macula.sources.*;
 import net.mine_diver.macula.util.MinecraftInstance;
 import net.mine_diver.macula.wrappers.ShaderProgram;
-import net.minecraft.block.BlockBase;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Living;
-import net.minecraft.item.ItemInstance;
+import net.minecraft.world.ItemInstance;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.tile.Tile;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.slf4j.Logger;
@@ -297,11 +297,11 @@ public class Shaders {
     }
 
     public static void setCamera(float f) {
-        Living viewEntity = MinecraftInstance.get().viewEntity;
+        LivingEntity viewEntity = MinecraftInstance.get().cameraEntity;
 
-        double x = viewEntity.prevRenderX + (viewEntity.x - viewEntity.prevRenderX) * f;
-        double y = viewEntity.prevRenderY + (viewEntity.y - viewEntity.prevRenderY) * f;
-        double z = viewEntity.prevRenderZ + (viewEntity.z - viewEntity.prevRenderZ) * f;
+        double x = viewEntity.xOld + (viewEntity.x - viewEntity.xOld) * f;
+        double y = viewEntity.yOld + (viewEntity.y - viewEntity.yOld) * f;
+        double z = viewEntity.zOld + (viewEntity.z - viewEntity.zOld) * f;
 
         if (isShadowPass) {
             glViewport(0, 0, shadowMapWidth, shadowMapHeight);
@@ -319,7 +319,7 @@ public class Shaders {
             glLoadIdentity();
             glTranslatef(0.0f, 0.0f, -100.0f);
             glRotatef(90.0f, 0.0f, 0.0f, -1.0f);
-            float angle = MinecraftInstance.get().level.method_198(f) * 360.0f;
+            float angle = MinecraftInstance.get().level.getTimeOfDay(f) * 360.0f;
             // night time
             // day time
             if (angle < 90.0 || angle > 270.0)
@@ -363,21 +363,21 @@ public class Shaders {
     }
 
     public static void beginRender(Minecraft minecraft, float f, long l) {
-        rainStrength = minecraft.level.getRainGradient(f);
+        rainStrength = minecraft.level.getRainLevel(f);
 
         if (isShadowPass) return;
 
         if (!isInitialized) init();
         if (!shaderPackLoaded) return;
 
-        if (minecraft.actualWidth != renderWidth || minecraft.actualHeight != renderHeight)
+        if (minecraft.width != renderWidth || minecraft.height != renderHeight)
             resize();
 
         if (shadowPassInterval > 0 && --shadowPassCounter <= 0) {
             // do shadow pass
-            boolean preShadowPassThirdPersonView = minecraft.options.thirdPerson;
+            boolean preShadowPassThirdPersonView = minecraft.options.thirdPersonView;
 
-            minecraft.options.thirdPerson = true;
+            minecraft.options.thirdPersonView = true;
 
             isShadowPass = true;
             shadowPassCounter = shadowPassInterval;
@@ -386,13 +386,13 @@ public class Shaders {
 
             useProgram(ProgramNone);
 
-            minecraft.gameRenderer.delta(f, l);
+            minecraft.gameRenderer.render(f, l);
 
             glFlush();
 
             isShadowPass = false;
 
-            minecraft.options.thirdPerson = preShadowPassThirdPersonView;
+            minecraft.options.thirdPersonView = preShadowPassThirdPersonView;
         }
 
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, dfb);
@@ -521,9 +521,9 @@ public class Shaders {
     public static void beginTerrain() {
         useProgram(Shaders.ProgramTerrain);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textureManager.getTextureId("/terrain_nh.png"));
+        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textures.loadTexture("/terrain_nh.png"));
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textureManager.getTextureId("/terrain_s.png"));
+        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textures.loadTexture("/terrain_s.png"));
         glActiveTexture(GL_TEXTURE0);
     }
 
@@ -534,9 +534,9 @@ public class Shaders {
     public static void beginWater() {
         useProgram(Shaders.ProgramWater);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textureManager.getTextureId("/terrain_nh.png"));
+        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textures.loadTexture("/terrain_nh.png"));
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textureManager.getTextureId("/terrain_s.png"));
+        glBindTexture(GL_TEXTURE_2D, MinecraftInstance.get().textures.loadTexture("/terrain_s.png"));
         glActiveTexture(GL_TEXTURE0);
     }
 
@@ -569,8 +569,8 @@ public class Shaders {
     }
 
     private static void resize() {
-        renderWidth = MinecraftInstance.get().actualWidth;
-        renderHeight = MinecraftInstance.get().actualHeight;
+        renderWidth = MinecraftInstance.get().width;
+        renderHeight = MinecraftInstance.get().height;
         setupFrameBuffer();
     }
 
@@ -654,12 +654,12 @@ public class Shaders {
             }
         }
         Minecraft minecraft = MinecraftInstance.get();
-        ItemInstance stack = minecraft.player.inventory.getHeldItem();
-        p.uniform_heldItemId.set1i((stack == null ? -1 : stack.itemId));
-        p.uniform_heldBlockLightValue.set1i((stack == null || stack.itemId >= BlockBase.BY_ID.length ? 0 : BlockBase.EMITTANCE[stack.itemId]));
+        ItemInstance stack = minecraft.player.inventory.getSelected();
+        p.uniform_heldItemId.set1i((stack == null ? -1 : stack.id));
+        p.uniform_heldBlockLightValue.set1i((stack == null || stack.id >= Tile.tiles.length ? 0 : Tile.lightEmission[stack.id]));
         p.uniform_fogMode.set1i((fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
         p.uniform_rainStrength.set1f(rainStrength);
-        p.uniform_worldTime.set1i((int) (minecraft.level.getLevelTime() % 24000L));
+        p.uniform_worldTime.set1i((int) (minecraft.level.getTime() % 24000L));
         p.uniform_aspectRatio.set1f((float) renderWidth / (float) renderHeight);
         p.uniform_viewWidth.set1f((float) renderWidth);
         p.uniform_viewHeight.set1f((float) renderHeight);
@@ -1152,6 +1152,6 @@ public class Shaders {
         destroy();
         isInitialized = false;
         init();
-        MinecraftInstance.get().worldRenderer.method_1537();
+        MinecraftInstance.get().levelRenderer.allChanged();
     }
 }

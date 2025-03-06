@@ -2,8 +2,8 @@ package net.mine_diver.macula.mixin;
 
 import net.mine_diver.macula.Shaders;
 import net.mine_diver.macula.util.TessellatorAccessor;
-import net.minecraft.class_214;
-import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.MemoryTracker;
+import net.minecraft.client.renderer.Tesselator;
 import org.lwjgl.opengl.ARBVertexProgram;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -15,37 +15,37 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
 
-@Mixin(Tessellator.class)
+@Mixin(Tesselator.class)
 public class TessellatorMixin implements TessellatorAccessor {
     @Shadow
-    private int drawingMode;
+    private int mode;
 
     @Shadow
-    private static boolean useTriangles;
+    private static boolean TRIANGLE_MODE;
 
     @Shadow
-    private int vertexAmount;
+    private int vertices;
 
     @Shadow
-    private boolean hasNormals;
+    private boolean hasNormal;
 
     @Shadow
-    private int[] bufferArray;
+    private int[] array;
 
     @Shadow
-    private int field_2068;
+    private int p;
 
     @Inject(
         method = "<init>(I)V",
         at = @At("RETURN")
     )
     private void onCor(int var1, CallbackInfo ci) {
-        shadersBuffer = class_214.method_744(var1 / 8 * 4);
+        shadersBuffer = MemoryTracker.createByteBuffer(var1 / 8 * 4);
         shadersShortBuffer = shadersBuffer.asShortBuffer();
     }
 
     @Inject(
-        method = "draw()V",
+        method = "end",
         at = @At(
             value = "INVOKE",
             target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V"
@@ -60,7 +60,7 @@ public class TessellatorMixin implements TessellatorAccessor {
     }
 
     @Inject(
-        method = "draw()V",
+        method = "end",
         at = @At(
             value = "INVOKE",
             target = "Lorg/lwjgl/opengl/GL11;glDrawArrays(III)V",
@@ -83,15 +83,15 @@ public class TessellatorMixin implements TessellatorAccessor {
     }
 
     @Inject(
-        method = "addVertex(DDD)V",
+        method = "vertex",
         at = @At(value = "HEAD")
     )
     private void onAddVertex(CallbackInfo ci) {
         if (!Shaders.shaderPackLoaded) return;
-        if (drawingMode == 7 && useTriangles && (vertexAmount + 1) % 4 == 0) {
-            if (hasNormals) {
-                bufferArray[field_2068 + 6] = bufferArray[(field_2068 - 24) + 6];
-                bufferArray[field_2068 + 8 + 6] = bufferArray[(field_2068 + 8 - 16) + 6];
+        if (mode == 7 && TRIANGLE_MODE && (vertices + 1) % 4 == 0) {
+            if (hasNormal) {
+                array[p + 6] = array[(p - 24) + 6];
+                array[p + 8 + 6] = array[(p + 8 - 16) + 6];
             }
 
             if (Shaders.entityAttrib >= 0) {

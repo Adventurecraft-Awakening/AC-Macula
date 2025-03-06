@@ -3,12 +3,11 @@ package net.mine_diver.macula.gui;
 import net.mine_diver.macula.Shaders;
 import net.mine_diver.macula.mixin.ScrollableBaseAccessor;
 import net.mine_diver.macula.sources.ShaderpackSource;
-import net.minecraft.client.gui.widgets.ScrollableBase;
-import net.minecraft.client.render.Tessellator;
-
+import net.minecraft.client.gui.components.AbstractSelectionList;
+import net.minecraft.client.renderer.Tesselator;
 import java.util.List;
 
-class ScrollableShaders extends ScrollableBase {
+class ScrollableShaders extends AbstractSelectionList {
     private List<String> shadersList;
     private int selectedIndex;
     private final long lastClicked = Long.MIN_VALUE;
@@ -39,12 +38,12 @@ class ScrollableShaders extends ScrollableBase {
     }
 
     @Override
-    protected int getSize() {
+    protected int getItemCount() {
         return this.shadersList.size();
     }
 
     @Override
-    protected void entryClicked(int index, boolean twice) {
+    protected void method_1267(int index, boolean twice) {
         if (index == this.selectedIndex && this.lastClicked == this.lastClickedCached) return;
         this.selectIndex(index);
     }
@@ -58,7 +57,7 @@ class ScrollableShaders extends ScrollableBase {
     }
 
     @Override
-    protected boolean isEntrySelected(int index) {
+    protected boolean isSelectedItem(int index) {
         return index == this.selectedIndex;
     }
 
@@ -66,13 +65,13 @@ class ScrollableShaders extends ScrollableBase {
     }
 
     @Override
-    protected void renderEntry(int index, int posX, int posY, int contentY, Tessellator tessellator) {
+    protected void renderEntry(int index, int posX, int posY, int contentY, Tesselator tessellator) {
         String s = this.shadersList.get(index);
         int separator = s.indexOf(ShaderpackSource.TypeSeparator);
         if (separator != -1) {
             s = s.substring(separator + ShaderpackSource.TypeSeparator.length());
         }
 
-        this.shadersGui.drawTextWithShadowCentred(shadersGui.getTextRenderer(), s, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
+        this.shadersGui.drawCenteredString(shadersGui.getTextRenderer(), s, ((ScrollableBaseAccessor) this).macula_getWidth() / 2, posY + 1, 0xe0e0e0);
     }
 }

@@ -1,9 +1,9 @@
 package net.mine_diver.macula.mixin.gui;
 
 import net.mine_diver.macula.gui.ShadersScreen;
-import net.minecraft.client.gui.screen.ScreenBase;
-import net.minecraft.client.gui.screen.menu.VideoSettings;
-import net.minecraft.client.gui.widgets.Button;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.VideoSettingsScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(VideoSettings.class)
-public class VideoSettingsScreenMixin extends ScreenBase {
+@Mixin(VideoSettingsScreen.class)
+public class VideoSettingsScreenMixin extends Screen {
     @Unique
     private static final int MACULA$SHADERS_BUTTON_ID = "macula:shaders".hashCode();
 
@@ -37,8 +37,8 @@ public class VideoSettingsScreenMixin extends ScreenBase {
     )
     private void macula_shadersButtonClicked(Button button, CallbackInfo ci) {
         if (button.id == MACULA$SHADERS_BUTTON_ID) {
-            minecraft.options.saveOptions();
-            minecraft.openScreen(new ShadersScreen(this));
+            minecraft.options.save();
+            minecraft.setScreen(new ShadersScreen(this));
             ci.cancel();
         }
     }
