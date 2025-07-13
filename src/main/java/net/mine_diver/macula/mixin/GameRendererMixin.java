@@ -58,7 +58,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 0
         )
     )
@@ -72,7 +72,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 0,
             shift = At.Shift.AFTER
         )
@@ -87,7 +87,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 1
         )
     )
@@ -101,7 +101,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 1,
             shift = At.Shift.AFTER
         )
@@ -116,7 +116,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 2
         )
     )
@@ -130,7 +130,7 @@ public abstract class GameRendererMixin {
         method = "render(FJ)V",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/LivingEntity;ID)I",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;render(Lnet/minecraft/world/entity/Mob;ID)I",
             ordinal = 2,
             shift = At.Shift.AFTER
         )
