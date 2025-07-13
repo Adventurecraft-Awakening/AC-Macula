@@ -24,5 +24,17 @@ public abstract class UniformLocation {
 
     public abstract void set3f(float x, float y, float z);
 
+    public void set3f(double x, double y, double z) {
+        set3f((float) x, (float) y, (float) z);
+    }
+
+    public void set3f(float[] values) {
+        set3f(values[0], values[1], values[2]);
+    }
+
+    public void set3f(double[] values) {
+        set3f(values[0], values[1], values[2]);
+    }
+
     public abstract void setMat4(boolean transpose, FloatBuffer matrix);
 }

@@ -553,14 +553,16 @@ public class Shaders {
         glDisable(GL_BLEND);
         useProgram(ProgramTextured);
 
-        if (isShadowPass) glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sfb); // was set to 0 in beginWeather()
+        if (isShadowPass)
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sfb); // was set to 0 in beginWeather()
     }
 
     public static void beginWeather() {
         glEnable(GL_BLEND);
         useProgram(Shaders.ProgramWeather);
 
-        if (isShadowPass) glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); // will be set to sbf in endHand()
+        if (isShadowPass)
+            glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); // will be set to sbf in endHand()
     }
 
     public static void endWeather() {
@@ -597,6 +599,7 @@ public class Shaders {
             if (vShader != 0) glAttachObjectARB(program, vShader);
             if (fShader != 0) glAttachObjectARB(program, fShader);
             if (entityAttrib >= 0) glBindAttribLocationARB(program, entityAttrib, "mc_Entity");
+
             glLinkProgramARB(program);
             glValidateProgramARB(program);
             printLogInfo(program, vShaderPath + " + " + fShaderPath);
@@ -622,8 +625,9 @@ public class Shaders {
         activeProgram = program;
         ShaderProgram p = programs[program];
         p.use();
-        if (p.isEmpty()) return;
-        else if (program == ProgramTextured) {
+        if (p.isEmpty()) {
+            return;
+        } else if (program == ProgramTextured) {
             p.uniform_texture.set1i(0);
         } else if (program == ProgramTexturedLit || program == ProgramHand || program == ProgramWeather) {
             p.uniform_texture.set1i(0);
@@ -665,10 +669,10 @@ public class Shaders {
         p.uniform_viewHeight.set1f((float) renderHeight);
         p.uniform_near.set1f(0.05F);
         p.uniform_far.set1f(256 >> minecraft.options.viewDistance);
-        p.uniform_sunPosition.set3f(sunPosition[0], sunPosition[1], sunPosition[2]);
-        p.uniform_moonPosition.set3f(moonPosition[0], moonPosition[1], moonPosition[2]);
-        p.uniform_previousCameraPosition.set3f((float) previousCameraPosition[0], (float) previousCameraPosition[1], (float) previousCameraPosition[2]);
-        p.uniform_cameraPosition.set3f((float) cameraPosition[0], (float) cameraPosition[1], (float) cameraPosition[2]);
+        p.uniform_sunPosition.set3f(sunPosition);
+        p.uniform_moonPosition.set3f(moonPosition);
+        p.uniform_previousCameraPosition.set3f(previousCameraPosition);
+        p.uniform_cameraPosition.set3f(cameraPosition);
         p.uniform_gbufferModelView.setMat4(false, modelView);
         p.uniform_gbufferModelViewInverse.setMat4(false, modelViewInverse);
     }
