@@ -51,6 +51,7 @@ public class Shaders {
     private static float rainStrength = 0.0f;
 
     private static boolean fogEnabled = true;
+    private static int fogMode = GL_EXP;
 
     public static int entityAttrib = -1;
 
@@ -256,7 +257,7 @@ public class Shaders {
                 useProgram(ProgramTextured);
         } else if (cap == GL_FOG) {
             fogEnabled = true;
-            programs[activeProgram].uniform_fogMode.set1i(glGetInteger(GL_FOG_MODE));
+            programs[activeProgram].uniform_fogMode.set1i(fogMode);
         }
     }
 
@@ -267,6 +268,15 @@ public class Shaders {
         } else if (cap == GL_FOG) {
             fogEnabled = false;
             programs[activeProgram].uniform_fogMode.set1i(0);
+        }
+    }
+
+    public static void suffix$glFogi(int pname, int param) {
+        if (pname == GL_FOG_MODE) {
+            fogMode = param;
+            if (fogEnabled) {
+                programs[activeProgram].uniform_fogMode.set1i(param);
+            }
         }
     }
 
@@ -661,7 +671,7 @@ public class Shaders {
         ItemInstance stack = minecraft.player.inventory.getSelected();
         p.uniform_heldItemId.set1i((stack == null ? -1 : stack.id));
         p.uniform_heldBlockLightValue.set1i((stack == null || stack.id >= Tile.tiles.length ? 0 : Tile.lightEmission[stack.id]));
-        p.uniform_fogMode.set1i((fogEnabled ? glGetInteger(GL_FOG_MODE) : 0));
+        p.uniform_fogMode.set1i((fogEnabled ? fogMode : 0));
         p.uniform_rainStrength.set1f(rainStrength);
         p.uniform_worldTime.set1i((int) (minecraft.level.getTime() % 24000L));
         p.uniform_aspectRatio.set1f((float) renderWidth / (float) renderHeight);
