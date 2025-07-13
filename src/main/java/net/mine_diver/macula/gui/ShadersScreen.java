@@ -14,42 +14,27 @@ import java.io.IOException;
 import java.util.List;
 
 public class ShadersScreen extends Screen {
+
     private static final int
-            SHADERS_FOLDER_BUTTON_ID = "macula:shaders_folder".hashCode(),
-            DONE_BUTTON_ID = "macula:done".hashCode();
+        SHADERS_FOLDER_BUTTON_ID = "macula:shaders_folder".hashCode(),
+        DONE_BUTTON_ID = "macula:done".hashCode();
 
     private static final float[] QUALITY_MULTIPLIERS = new float[] {
-            0.5F, 0.6F, 0.6666667F, 0.75F, 0.8333333F, 0.9F, 1, 1.1666666F, 1.3333334F, 1.5F, 1.6666666F, 1.8F, 2
-    };
-    private static final String[] QUALITY_MULTIPLIER_NAMES = new String[] {
-            "0.5x", "0.6x", "0.66x", "0.75x", "0.83x", "0.9x", "1x", "1.16x", "1.33x", "1.5x", "1.66x", "1.8x", "2x"
+        0.5F, 0.6F, 0.6666667F, 0.75F, 0.8333333F, 0.9F, 1, 1.1666666F, 1.3333334F, 1.5F, 1.6666666F, 1.8F, 2
     };
     private static final float QUALITY_MULTIPLIER_DEFAULT = 1;
 
-    public static String toStringValue(float val, float[] values, String[] names) {
+    public static String toStringValue(float val, float[] values) {
         int i = getValueIndex(val, values);
-        return names[i];
+        return "%.2fx".formatted(values[i]);
     }
 
     private float getNextValue(float val, float[] values, float valDef, boolean forward, boolean reset) {
         if (reset)
             return valDef;
-        else {
-            int i = getValueIndex(val, values);
 
-            if (forward) {
-                ++i;
-
-                if (i >= values.length)
-                    i = 0;
-            } else {
-                --i;
-
-                if (i < 0)
-                    i = values.length - 1;
-            }
-            return values[i];
-        }
+        int i = getValueIndex(val, values) + (forward ? 1 : -1);
+        return values[Integer.remainderUnsigned(i, values.length)];
     }
 
     public static int getValueIndex(float val, float[] values) {
@@ -63,7 +48,7 @@ public class ShadersScreen extends Screen {
     }
 
     public static String toStringQuality(float val) {
-        return toStringValue(val, QUALITY_MULTIPLIERS, QUALITY_MULTIPLIER_NAMES);
+        return toStringValue(val, QUALITY_MULTIPLIERS);
     }
 
     private final Screen parent;
@@ -118,6 +103,7 @@ public class ShadersScreen extends Screen {
     protected void buttonClicked(Button button) {
         super.buttonClicked(button);
         if (!button.active) return;
+
         if (button instanceof ShaderOptionButton sob) {
             switch (sob.getEnumShaderOption()) {
                 case SHADOW_RES_MUL -> {
@@ -149,11 +135,17 @@ public class ShadersScreen extends Screen {
             updateTimer += 20;
         }
         drawCenteredString(font, "Shaders", width / 2, 15, 0xffffff);
-        String debug = "OpenGL: " + Shaders.glVersionString + ", " + Shaders.glVendorString + ", " + Shaders.glRendererString;
+        
+        String debug = "OpenGL: %s, %s, %s".formatted(
+            Shaders.glVersionString,
+            Shaders.glVendorString,
+            Shaders.glRendererString);
         int debugWidth = font.width(debug);
         if (debugWidth < width - 5)
             drawCenteredString(font, debug, width / 2, height - 40, 0x808080);
-        else drawString(font, debug, 5, height - 40, 0x808080);
+        else
+            drawString(font, debug, 5, height - 40, 0x808080);
+
         super.render(i, j, f);
     }
 
