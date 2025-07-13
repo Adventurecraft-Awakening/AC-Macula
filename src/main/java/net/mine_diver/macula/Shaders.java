@@ -9,7 +9,7 @@ import net.mine_diver.macula.util.MinecraftInstance;
 import net.mine_diver.macula.wrappers.ShaderProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.ItemInstance;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.tile.Tile;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -297,7 +297,7 @@ public class Shaders {
     }
 
     public static void setCamera(float f) {
-        LivingEntity viewEntity = MinecraftInstance.get().cameraEntity;
+        Mob viewEntity = MinecraftInstance.get().cameraEntity;
 
         double x = viewEntity.xOld + (viewEntity.x - viewEntity.xOld) * f;
         double y = viewEntity.yOld + (viewEntity.y - viewEntity.yOld) * f;
