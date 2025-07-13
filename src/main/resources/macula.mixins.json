@@ -8,11 +8,11 @@
   "server": [
   ],
   "client": [
+    "MixinGL11",
     "BlockRendererMixin",
     "BlockRenderManagerMixin",
     "ChunkBuilderMixin",
     "GameRendererMixin",
-    "LivingEntityRendererMixin",
     "ScrollableBaseAccessor",
     "TessellatorMixin",
     "WorldRendererMixin",

@@ -250,20 +250,20 @@ public class Shaders {
         }
     }
 
-    public static void glEnableWrapper(int cap) {
-        glEnable(cap);
+    public static void suffix$glEnable(int cap) {
         if (cap == GL_TEXTURE_2D) {
-            if (activeProgram == ProgramBasic) useProgram(ProgramTextured);
+            if (activeProgram == ProgramBasic)
+                useProgram(ProgramTextured);
         } else if (cap == GL_FOG) {
             fogEnabled = true;
             programs[activeProgram].uniform_fogMode.set1i(glGetInteger(GL_FOG_MODE));
         }
     }
 
-    public static void glDisableWrapper(int cap) {
-        glDisable(cap);
+    public static void suffix$glDisable(int cap) {
         if (cap == GL_TEXTURE_2D) {
-            if (activeProgram == ProgramTextured || activeProgram == ProgramTexturedLit) useProgram(ProgramBasic);
+            if (activeProgram == ProgramTextured || activeProgram == ProgramTexturedLit)
+                useProgram(ProgramBasic);
         } else if (cap == GL_FOG) {
             fogEnabled = false;
             programs[activeProgram].uniform_fogMode.set1i(0);

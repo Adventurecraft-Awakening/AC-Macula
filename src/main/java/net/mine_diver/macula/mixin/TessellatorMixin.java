@@ -17,6 +17,7 @@ import java.nio.ShortBuffer;
 
 @Mixin(Tesselator.class)
 public class TessellatorMixin implements TessellatorAccessor {
+
     @Shadow
     private int mode;
 
